@@ -1,0 +1,46 @@
+cmake_minimum_required(VERSION 3.28)
+project(custom_tls)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(gmpxx REQUIRED IMPORTED_TARGET gmpxx)
+pkg_check_modules(nettle REQUIRED IMPORTED_TARGET nettle)
+pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
+
+find_package(jsoncpp REQUIRED CONFIG)
+
+find_package(Catch2 REQUIRED CONFIG)
+
+file(GLOB_RECURSE SOURCES
+        src/*.cc
+        src/*.cpp
+)
+
+add_library(custom_tls STATIC ${SOURCES})
+
+target_include_directories(custom_tls PUBLIC include)
+
+target_link_libraries(custom_tls PRIVATE
+        PkgConfig::gmpxx
+        PkgConfig::nettle
+        PkgConfig::hogweed
+        JsonCpp::JsonCpp
+)
+
+file(GLOB_RECURSE TEST_SOURCES
+        tests/*.cc
+        tests/*.cpp
+)
+
+add_executable(custom_tls_test ${TEST_SOURCES})
+
+add_dependencies(custom_tls_test custom_tls)
+
+target_link_libraries(custom_tls_test PRIVATE
+        custom_tls
+        Catch2::Catch2
+        Catch2::Catch2WithMain
+)

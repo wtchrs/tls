@@ -1,0 +1,10 @@
+{
+  "name": "custom-tls",
+  "version": "0.1",
+  "dependencies": [
+    "gmp",
+    "jsoncpp",
+    "nettle",
+    "catch2"
+  ]
+}
