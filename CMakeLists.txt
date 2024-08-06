@@ -15,8 +15,8 @@ find_package(jsoncpp REQUIRED CONFIG)
 find_package(Catch2 REQUIRED CONFIG)
 
 file(GLOB_RECURSE SOURCES
-        src/*.cc
-        src/*.cpp
+        src/diffie_hellman.cc
+        src/mpz.cc
 )
 
 add_library(custom_tls STATIC ${SOURCES})
@@ -31,8 +31,7 @@ target_link_libraries(custom_tls PRIVATE
 )
 
 file(GLOB_RECURSE TEST_SOURCES
-        tests/*.cc
-        tests/*.cpp
+        tests/test.cc
 )
 
 add_executable(custom_tls_test ${TEST_SOURCES})

@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <sstream>
 
+
 /**
  * @brief Returns the next prime number greater than n.
  * @param n The starting number.
@@ -74,9 +75,10 @@ template<class C>
 std::string hexprint(const char *p, const C &c) {
     std::stringstream ss;
     ss << p << " : 0x";
-    for (const unsigned char ch : c)
+    for (const unsigned char ch: c)
         ss << std::hex << std::setfill('0') << std::setw(2) << +ch;
     return ss.str();
 }
+
 
 #endif //MPZ_H
