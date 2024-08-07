@@ -1,0 +1,27 @@
+name: vcpkg CI with CMakePresets
+
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '6af584dd59aa5bdba75dae6781ec74614e03e5b9'
+
+      - name: Build and Test
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: 'release'
+          buildPreset: 'build-release'
+          testPreset: 'test-release'

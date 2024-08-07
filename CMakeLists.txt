@@ -35,12 +35,17 @@ file(GLOB_RECURSE TEST_SOURCES
         tests/test.cc
 )
 
-add_executable(custom_tls_test ${TEST_SOURCES})
+add_executable(catch2-test ${TEST_SOURCES})
 
-add_dependencies(custom_tls_test custom_tls)
+add_dependencies(catch2-test custom_tls)
 
-target_link_libraries(custom_tls_test PRIVATE
+target_link_libraries(catch2-test PRIVATE
         custom_tls
         Catch2::Catch2
         Catch2::Catch2WithMain
 )
+
+include(CTest)
+enable_testing()
+
+add_test(NAME Catch2Test COMMAND catch2-test)

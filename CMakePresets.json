@@ -11,25 +11,45 @@
     },
     {
       "name": "debug",
-      "generator": "Ninja",
+      "inherits": "default",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      },
-      "environment": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "release",
-      "generator": "Ninja",
+      "inherits": "default",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      },
-      "environment": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-debug",
+      "configurePreset": "debug",
+      "description": "Build the debug configuration"
+    },
+    {
+      "name": "build-release",
+      "configurePreset": "release",
+      "description": "Build the release configuration"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-debug",
+      "configurePreset": "debug",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error", "stopOnFailure": false}
+    },
+    {
+      "name": "test-release",
+      "configurePreset": "release",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error", "stopOnFailure": false}
     }
   ]
 }
