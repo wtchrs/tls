@@ -9,13 +9,13 @@
 #include <random>
 #include <vector>
 
-mpz_class nextprime(mpz_class n) {
+mpz_class nextprime(const mpz_class &n) {
     mpz_class r;
     mpz_nextprime(r.get_mpz_t(), n.get_mpz_t());
     return r;
 }
 
-mpz_class powm(mpz_class base, mpz_class exp, mpz_class mod) {
+mpz_class powm(const mpz_class &base, const mpz_class &exp, const mpz_class &mod) {
     mpz_class r;
     assert(mod != 0);
     mpz_powm(r.get_mpz_t(), base.get_mpz_t(), exp.get_mpz_t(), mod.get_mpz_t());

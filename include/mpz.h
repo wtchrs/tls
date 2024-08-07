@@ -15,7 +15,7 @@
  * @param n The starting number.
  * @return The next prime number.
  */
-mpz_class nextprime(mpz_class n);
+mpz_class nextprime(const mpz_class &n);
 
 /**
  * @brief Computes (base^exp) % mod.
@@ -24,7 +24,7 @@ mpz_class nextprime(mpz_class n);
  * @param mod The modulus.
  * @return The result of (base^exp) % mod.
  */
-mpz_class powm(mpz_class base, mpz_class exp, mpz_class mod);
+mpz_class powm(const mpz_class &base, const mpz_class &exp, const mpz_class &mod);
 
 /**
  * @brief Generates a random prime number with a specified number of bytes.
