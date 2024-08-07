@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <rsa.h>
 #include <catch2/catch_test_macros.hpp>
 #include "diffie_hellman.h"
 #include "mpz.h"
@@ -184,4 +185,14 @@ TEST_CASE("Elliptic Curve secp256k1") {
         REQUIRE(P.x == test_vector[i + 1]);
         REQUIRE(P.y == test_vector[i + 2]);
     }
+}
+
+TEST_CASE("RSA") {
+    const rsa_class rsa{256};
+    const auto a = rsa.encode(mpz_class{"0x23423423"});
+    REQUIRE(0x23423423 == rsa.decode(a));
+
+    const auto msg = mpz_class{"0x143214324234"};
+    const auto b = rsa.sign(msg);
+    REQUIRE(rsa.encode(b) == msg);
 }

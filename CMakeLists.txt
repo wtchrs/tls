@@ -17,6 +17,7 @@ find_package(Catch2 REQUIRED CONFIG)
 file(GLOB_RECURSE SOURCES
         src/diffie_hellman.cc
         src/mpz.cc
+        src/rsa.cc
 )
 
 add_library(custom_tls STATIC ${SOURCES})
