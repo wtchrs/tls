@@ -50,6 +50,7 @@ protected:
      * @param z The value to compute the modular inverse of.
      * @return The modular inverse of z.
      */
+    [[nodiscard]]
     mpz_class mod_inv(const mpz_class &z) const;
 };
 
@@ -85,10 +86,10 @@ struct ec_point : ec_field {
     /**
      * @brief Multiplies an elliptic curve point by a scalar.
      * @param l The scalar to multiply by.
-     * @param r The point to multiply.
+     * @param p The point to multiply.
      * @return The result of the multiplication.
      */
-    friend ec_point operator*(const mpz_class &l, const ec_point &r);
+    friend ec_point operator*(const mpz_class &l, const ec_point &p);
 };
 
 

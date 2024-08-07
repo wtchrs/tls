@@ -15,6 +15,7 @@
  * @param n The starting number.
  * @return The next prime number.
  */
+[[nodiscard]]
 mpz_class nextprime(const mpz_class &n);
 
 /**
@@ -24,6 +25,7 @@ mpz_class nextprime(const mpz_class &n);
  * @param mod The modulus.
  * @return The result of (base^exp) % mod.
  */
+[[nodiscard]]
 mpz_class powm(const mpz_class &base, const mpz_class &exp, const mpz_class &mod);
 
 /**
@@ -31,6 +33,7 @@ mpz_class powm(const mpz_class &base, const mpz_class &exp, const mpz_class &mod
  * @param b The number of bytes.
  * @return A random prime number.
  */
+[[nodiscard]]
 mpz_class random_prime(unsigned b);
 
 /**
@@ -55,6 +58,7 @@ void mpz2bnd(mpz_class n, It begin, It end) {
  * @return The resulting mpz_class number.
  */
 template<typename It>
+[[nodiscard]]
 mpz_class bnd2mpz(It begin, It end) {
     std::stringstream ss;
     ss << "0x";
@@ -72,6 +76,7 @@ mpz_class bnd2mpz(It begin, It end) {
  * @return The resulting hexadecimal string.
  */
 template<class C>
+[[nodiscard]]
 std::string hexprint(const char *p, const C &c) {
     std::stringstream ss;
     ss << p << " : 0x";

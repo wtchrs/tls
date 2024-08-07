@@ -23,7 +23,7 @@ public:
      *
      * @param key_size The size of the RSA key in bits.
      */
-    rsa_class(int key_size);
+    explicit rsa_class(int key_size);
 
     /**
      * @brief Constructs an RSA object with provided public and private keys.
@@ -38,6 +38,7 @@ public:
      * @param m The message to be signed.
      * @return The signed message.
      */
+    [[nodiscard]]
     mpz_class sign(const mpz_class& m) const;
 
     /**
@@ -45,6 +46,7 @@ public:
      * @param m The message to be encoded.
      * @return The encoded message.
      */
+    [[nodiscard]]
     mpz_class encode(const mpz_class& m) const;
 
     /**
@@ -52,6 +54,7 @@ public:
      * @param m The message to be decoded.
      * @return The decoded message.
      */
+    [[nodiscard]]
     mpz_class decode(const mpz_class& m) const;
 
 protected:
