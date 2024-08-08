@@ -31,7 +31,7 @@ public:
      * @param d The private exponent.
      * @param K The modulus.
      */
-    rsa_class(const mpz_class& e, const mpz_class& d, const mpz_class& K);
+    rsa_class(const mpz_class &e, const mpz_class &d, const mpz_class &K);
 
     /**
      * @brief Signs a message by decoding it with the private key.
@@ -39,7 +39,7 @@ public:
      * @return The signed message.
      */
     [[nodiscard]]
-    mpz_class sign(const mpz_class& m) const;
+    mpz_class sign(const mpz_class &m) const;
 
     /**
      * @brief Encodes a message using the public key.
@@ -47,7 +47,7 @@ public:
      * @return The encoded message.
      */
     [[nodiscard]]
-    mpz_class encode(const mpz_class& m) const;
+    mpz_class encode(const mpz_class &m) const;
 
     /**
      * @brief Decodes a message using the private key.
@@ -55,11 +55,11 @@ public:
      * @return The decoded message.
      */
     [[nodiscard]]
-    mpz_class decode(const mpz_class& m) const;
+    mpz_class decode(const mpz_class &m) const;
 
 protected:
     mpz_class p, q, d, phi;
 };
 
 
-#endif //RSA_H
+#endif // RSA_H

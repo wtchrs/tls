@@ -2,9 +2,9 @@
 // Created by wtchr on 8/5/2024.
 //
 
+#include <catch2/catch_test_macros.hpp>
 #include <iostream>
 #include <rsa.h>
-#include <catch2/catch_test_macros.hpp>
 #include "diffie_hellman.h"
 #include "mpz.h"
 

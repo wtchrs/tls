@@ -29,4 +29,4 @@ struct diffie_hellman {
 };
 
 
-#endif //DIFFIE_HELLMAN_H
+#endif // DIFFIE_HELLMAN_H

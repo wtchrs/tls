@@ -131,4 +131,4 @@ private:
 };
 
 
-#endif //ECDSA_H
+#endif // ECDSA_H
