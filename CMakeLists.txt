@@ -22,6 +22,7 @@ find_package(Catch2 REQUIRED CONFIG)
 
 file(GLOB_RECURSE SOURCES
         src/diffie_hellman.cc
+        src/ecdsa.cc
         src/mpz.cc
         src/rsa.cc
 )
@@ -39,6 +40,7 @@ target_link_libraries(custom_tls PRIVATE
 
 file(GLOB_RECURSE TEST_SOURCES
         tests/test.cc
+        tests/ecdsa.cc
 )
 
 add_executable(catch2-test ${TEST_SOURCES})
@@ -47,6 +49,8 @@ add_dependencies(catch2-test custom_tls)
 
 target_link_libraries(catch2-test PRIVATE
         custom_tls
+        PkgConfig::nettle
+        PkgConfig::hogweed
         Catch2::Catch2
         Catch2::Catch2WithMain
 )
