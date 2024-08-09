@@ -21,10 +21,10 @@ find_package(jsoncpp REQUIRED CONFIG)
 find_package(Catch2 REQUIRED CONFIG)
 
 file(GLOB_RECURSE SOURCES
-        src/diffie_hellman.cc
-        src/ecdsa.cc
-        src/mpz.cc
-        src/rsa.cc
+        src/diffie_hellman.cpp
+        src/ecdsa.cpp
+        src/mpz.cpp
+        src/rsa.cpp
 )
 
 add_library(custom_tls STATIC ${SOURCES})
@@ -39,8 +39,10 @@ target_link_libraries(custom_tls PRIVATE
 )
 
 file(GLOB_RECURSE TEST_SOURCES
-        tests/test.cc
-        tests/ecdsa.cc
+        tests/diffie_hellman.cpp
+        tests/ecdsa.cpp
+        tests/mpz.cpp
+        tests/rsa.cpp
 )
 
 add_executable(catch2-test ${TEST_SOURCES})
