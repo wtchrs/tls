@@ -57,4 +57,4 @@ private:
 };
 
 
-#endif // ECDSA_H
+#endif

@@ -2,11 +2,11 @@
 // Created by wtchr on 8/8/2024.
 //
 
-#include "ecdsa.h"
+#include "tls/ecdsa.h"
 #include <catch2/catch_test_macros.hpp>
 #include <nettle/sha.h>
 #include <array>
-#include "mpz.h"
+#include "tls/mpz.h"
 
 TEST_CASE("ECDSA") {
     const ec_field secp256r1{

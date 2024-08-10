@@ -4,8 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
-#include "diffie_hellman.h"
-#include "mpz.h"
+#include "tls/diffie_hellman.h"
+#include "tls/mpz.h"
 
 TEST_CASE("Diffie Hellman Key Exchange") {
     diffie_hellman alice, bob;

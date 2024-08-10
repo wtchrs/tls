@@ -2,8 +2,8 @@
 // Created by wtchr on 8/7/2024.
 //
 
-#include "rsa.h"
-#include "mpz.h"
+#include "tls/rsa.h"
+#include "tls/mpz.h"
 
 rsa_class::rsa_class(const int key_size) {
     // Generate two random primes p and q

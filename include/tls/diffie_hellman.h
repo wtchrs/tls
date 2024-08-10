@@ -104,4 +104,4 @@ struct ec_point : ec_field {
 };
 
 
-#endif // DIFFIE_HELLMAN_H
+#endif

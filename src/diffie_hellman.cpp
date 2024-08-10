@@ -2,11 +2,11 @@
 // Created by wtchr on 8/5/2024.
 //
 
-#include "diffie_hellman.h"
+#include "tls/diffie_hellman.h"
 
 #include <cassert>
 #include <vector>
-#include "mpz.h"
+#include "tls/mpz.h"
 
 // diffie_hellman
 

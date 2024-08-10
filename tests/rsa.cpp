@@ -3,7 +3,7 @@
 //
 
 #include <catch2/catch_test_macros.hpp>
-#include "rsa.h"
+#include "tls/rsa.h"
 
 TEST_CASE("RSA") {
     const rsa_class rsa{256};

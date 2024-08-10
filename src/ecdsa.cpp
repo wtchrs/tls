@@ -2,11 +2,11 @@
 // Created by wtchr on 8/8/2024.
 //
 
-#include "ecdsa.h"
+#include "tls/ecdsa.h"
 
 #include <cassert>
 #include <vector>
-#include "mpz.h"
+#include "tls/mpz.h"
 
 ecdsa_class::ecdsa_class(const ec_point &G, mpz_class n)
     : ec_point{G} {

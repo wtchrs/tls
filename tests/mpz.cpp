@@ -3,7 +3,7 @@
 //
 
 #include <catch2/catch_test_macros.hpp>
-#include "mpz.h"
+#include "tls/mpz.h"
 
 TEST_CASE("mpz") {
     uint8_t arr[8];
