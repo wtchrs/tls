@@ -19,6 +19,7 @@ pkg_check_modules(nettle REQUIRED IMPORTED_TARGET nettle)
 pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
 
 file(GLOB_RECURSE SOURCES
+        src/aes.cpp
         src/diffie_hellman.cpp
         src/ecdsa.cpp
         src/mpz.cpp
@@ -26,6 +27,8 @@ file(GLOB_RECURSE SOURCES
 )
 
 file(GLOB_RECURSE TEST_SOURCES
+        tests/aes.cpp
+        tests/cipher_mode.cpp
         tests/diffie_hellman.cpp
         tests/ecdsa.cpp
         tests/mpz.cpp
@@ -51,6 +54,7 @@ target_link_libraries(catch2-test PRIVATE
         Catch2::Catch2
         Catch2::Catch2WithMain
 )
+target_compile_definitions(catch2-test PRIVATE TESTING)
 
 include(CTest)
 enable_testing()
