@@ -86,4 +86,4 @@ std::string hexprint(const char *p, const C &c) {
 }
 
 
-#endif // MPZ_H
+#endif
