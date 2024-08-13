@@ -2,9 +2,9 @@
 // Created by wtchr on 8/5/2024.
 //
 
+#include "tls/diffie_hellman.h"
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
-#include "tls/diffie_hellman.h"
 #include "tls/mpz.h"
 
 TEST_CASE("Diffie Hellman Key Exchange") {
@@ -162,12 +162,14 @@ TEST_CASE("Elliptic Curve secp256k1") {
             mpz_class{"0xE51E970159C23CC65C3A7BE6B99315110809CD9ACD992F1EDC9BCE55AF301705"},
             mpz_class{"115792089237316195423570985008687907852837564279074904382605163141518161494336"},
             mpz_class{"0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"},
-            mpz_class{"0xB7C52588D95C3B9AA25B0403F1EEF75702E84BB7597AABE663B82F6F04EF2777"}};
+            mpz_class{"0xB7C52588D95C3B9AA25B0403F1EEF75702E84BB7597AABE663B82F6F04EF2777"}
+    };
 
     ec_field secp256k1{0, 7, mpz_class{"0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"}};
     ec_point G{
             mpz_class{"0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"},
-            mpz_class{"0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"}, secp256k1};
+            mpz_class{"0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"}, secp256k1
+    };
 
     for (int i = 0; i < sizeof(secp256k1) / sizeof(mpz_class); i += 3) {
         auto P = test_vector[i] * G;

@@ -2,8 +2,8 @@
 // Created by wtchr on 8/9/2024.
 //
 
-#include <catch2/catch_test_macros.hpp>
 #include "tls/mpz.h"
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("mpz") {
     uint8_t arr[8];
@@ -12,4 +12,3 @@ TEST_CASE("mpz") {
     mpz_class b = bnd2mpz(arr, arr + 8);
     REQUIRE(a == b);
 }
-

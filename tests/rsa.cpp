@@ -2,8 +2,8 @@
 // Created by wtchr on 8/9/2024.
 //
 
-#include <catch2/catch_test_macros.hpp>
 #include "tls/rsa.h"
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("RSA") {
     const rsa_class rsa{256};
