@@ -29,6 +29,21 @@ TEST_CASE("SHA") {
     }
 
     SECTION("SHA-2") {
+        SECTION("SHA-224") {
+            const char *result[] = {
+                    "0x23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7",
+                    "0x75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525",
+                    "0xc97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3"
+            };
+            sha224 sha{};
+            for (int i = 0; i < 3; ++i) {
+                unsigned char nresult[28];
+                mpz2bnd(mpz_class{result[i]}, nresult, nresult + 28);
+                auto a = sha.hash(s[i].begin(), s[i].end());
+                REQUIRE(std::equal(a.begin(), a.end(), nresult));
+            }
+        }
+
         SECTION("SHA-256") {
             const char *result[] = {
                     "0xba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
