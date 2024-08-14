@@ -2,7 +2,7 @@
 // Created by wtchr on 8/13/2024.
 //
 
-#include "tls/sha.h"
+#include "tls/sha1.h"
 
 #include <algorithm>
 #include "tls/mpz.h"
@@ -11,18 +11,26 @@ static uint32_t left_rotate(const uint32_t a, const int bits) {
     return a << bits | a >> 32 - bits;
 }
 
+template<int BLOCK_SIZE>
+static void preprocess(std::vector<unsigned char> &v) {
+    const size_t len = v.size();
+    v.push_back(0x80);
+    size_t padding_size = BLOCK_SIZE - (len + 1) % BLOCK_SIZE;
+    if (padding_size < BLOCK_SIZE / 8)
+        padding_size += BLOCK_SIZE;
+    v.resize(len + 1 + padding_size, 0);
+    mpz2bnd(static_cast<unsigned long>(len * 8), v.end() - BLOCK_SIZE / 8, v.end());
+}
+
+// sha1
+
 sha1::sha1() {
     if (constexpr int k = 0x12345678; htonl(k) == k)
         big_endian = true;
 }
 
 void sha1::preprocess(std::vector<unsigned char> &v) {
-    const size_t len = v.size();
-    v.push_back(0x80);
-    while (v.size() % block_size != block_size - 8)
-        v.push_back(0);
-    v.resize(v.size() + 8);
-    mpz2bnd(static_cast<unsigned long>(len * 8), v.end() - 8, v.end());
+    ::preprocess<block_size>(v);
 }
 
 void sha1::process_chunk(unsigned char *p) {

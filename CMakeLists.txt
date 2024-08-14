@@ -24,7 +24,8 @@ file(GLOB_RECURSE SOURCES
         src/ecdsa.cpp
         src/mpz.cpp
         src/rsa.cpp
-        src/sha.cpp
+        src/sha1.cpp
+        src/sha2.cpp
 )
 
 file(GLOB_RECURSE TEST_SOURCES
