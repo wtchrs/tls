@@ -5,8 +5,8 @@
 #ifndef CIPHER_MODE_H
 #define CIPHER_MODE_H
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstring>
 #include <vector>

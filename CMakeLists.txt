@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(custom_tls)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (MSVC)
@@ -24,6 +24,7 @@ file(GLOB_RECURSE SOURCES
         src/ecdsa.cpp
         src/mpz.cpp
         src/rsa.cpp
+        src/sha1.cpp
 )
 
 file(GLOB_RECURSE TEST_SOURCES
@@ -33,6 +34,7 @@ file(GLOB_RECURSE TEST_SOURCES
         tests/ecdsa.cpp
         tests/mpz.cpp
         tests/rsa.cpp
+        tests/sha.cpp
 )
 
 add_library(custom_tls STATIC ${SOURCES})
