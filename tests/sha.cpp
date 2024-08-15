@@ -4,8 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "tls/mpz.h"
-#include "tls/sha1.h"
-#include "tls/sha2.h"
+#include "tls/sha/sha1.h"
+#include "tls/sha/sha2.h"
 
 TEST_CASE("SHA") {
     const std::string s[] = {
