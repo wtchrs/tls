@@ -8,13 +8,13 @@
 #include "tls/mpz.h"
 
 static uint32_t left_rotate(const uint32_t a, const int bits) {
-    return a << bits | a >> 32 - bits;
+    return a << bits | a >> (32 - bits);
 }
 
 // sha1
 
 sha1::sha1() {
-    if (constexpr int k = 0x12345678; htonl(k) == k)
+    if (constexpr uint32_t val = 0x12345678; htonl(val) == val)
         big_endian = true;
 }
 
