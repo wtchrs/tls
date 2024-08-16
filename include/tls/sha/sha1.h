@@ -16,8 +16,8 @@
  */
 class sha1 {
 public:
-    static constexpr int block_size = 64; ///< Block size in bytes
-    static constexpr int output_size = 20; ///< Output size in bytes
+    static constexpr size_t block_size = 64; ///< Block size in bytes
+    static constexpr size_t output_size = 20; ///< Output size in bytes
 
     /**
      * @brief Constructs a SHA-1 object.

@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include "tls/network_utils.h"
 
 // Define the operations used in the SHA-2 hash computation.
 
@@ -91,6 +92,8 @@ class sha2_base {
 public:
     using BYTE = unsigned char;
     using WORD = std::conditional_t<BLOCK_SIZE == 64, uint32_t, uint64_t>;
+
+    static constexpr size_t block_size = BLOCK_SIZE;
     static constexpr size_t W_SIZE = conditional_value<size_t, BLOCK_SIZE == 64, 64, 80>::value;
 
     sha2_base();
