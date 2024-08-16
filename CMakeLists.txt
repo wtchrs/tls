@@ -32,6 +32,7 @@ file(GLOB_RECURSE TEST_SOURCES
         tests/cipher_mode.cpp
         tests/diffie_hellman.cpp
         tests/ecdsa.cpp
+        tests/hmac.cpp
         tests/mpz.cpp
         tests/rsa.cpp
         tests/sha.cpp
