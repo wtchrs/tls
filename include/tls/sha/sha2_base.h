@@ -82,7 +82,9 @@ struct conditional_value<T, false, t1, t2> {
 
 /**
  * @brief Base class for SHA-2 (Secure Hash Algorithm 2) family.
+ *
  * This class provides common functionalities for SHA-2 hash algorithms.
+ *
  * @tparam Derived The derived class type (e.g., sha224, sha256).
  * @tparam BLOCK_SIZE The block size in bytes.
  * @tparam OUTPUT_SIZE The output size in bytes.
@@ -117,13 +119,13 @@ protected:
 private:
     /**
      * @brief Preprocesses the input data by padding.
-     * @param v The input data to preprocess.
+     * @param[in,out] v The input data to preprocess.
      */
     static void preprocess(std::vector<BYTE> &v);
 
     /**
      * @brief Processes a single chunk of the input data.
-     * @param p Pointer to the chunk to process.
+     * @param[in,out] p Pointer to the chunk to process.
      */
     void process_chunk(BYTE *p);
 };

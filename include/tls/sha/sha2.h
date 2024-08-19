@@ -10,6 +10,7 @@
 
 /**
  * @brief SHA-224 (Secure Hash Algorithm 224) class.
+ *
  * This class provides functionalities for computing SHA-224 hashes.
  */
 class sha224 : public sha2_base<sha224, 64, 28> {
@@ -35,6 +36,7 @@ public:
 
 /**
  * @brief SHA-256 (Secure Hash Algorithm 256) class.
+ *
  * This class provides functionalities for computing SHA-256 hashes.
  */
 class sha256 : public sha2_base<sha256, 64, 32> {
@@ -60,6 +62,7 @@ public:
 
 /**
  * @brief SHA-384 (Secure Hash Algorithm 384) class.
+ *
  * This class provides functionalities for computing SHA-384 hashes.
  */
 class sha384 : public sha2_base<sha384, 128, 48> {
@@ -94,6 +97,7 @@ public:
 
 /**
  * @brief SHA-512 (Secure Hash Algorithm 512) class.
+ *
  * This class provides functionalities for computing SHA-512 hashes.
  */
 class sha512 : public sha2_base<sha512, 128, 64> {

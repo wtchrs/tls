@@ -15,7 +15,9 @@
 
 /**
  * @brief Template class for cipher modes.
+ *
  * This class provides a base for different cipher modes of operation.
+ *
  * @tparam CIPHER The cipher algorithm to be used (e.g., aes128).
  */
 template<class CIPHER>
@@ -37,7 +39,9 @@ protected:
 
 /**
  * @brief Cipher Block Chaining (CBC) mode class.
+ *
  * This class implements the CBC mode of operation for block ciphers.
+ *
  * @tparam CIPHER The cipher algorithm to be used (e.g., AES).
  */
 template<class CIPHER>
@@ -51,14 +55,14 @@ public:
 
     /**
      * @brief Encrypts data in CBC mode.
-     * @param p Pointer to the data to encrypt.
+     * @param[in,out] p Pointer to the data to encrypt.
      * @param len Length of the data to encrypt (must be a multiple of 16).
      */
     void encrypt(unsigned char *p, size_t len) const;
 
     /**
      * @brief Decrypts data in CBC mode.
-     * @param p Pointer to the data to decrypt.
+     * @param[in,out] p Pointer to the data to decrypt.
      * @param len Length of the data to decrypt (must be a multiple of 16).
      */
     void decrypt(unsigned char *p, size_t len) const;
@@ -101,7 +105,9 @@ void CBC<CIPHER>::decrypt(unsigned char *p, const size_t len) const {
 
 /**
  * @brief Galois/Counter Mode (GCM) class.
+ *
  * This class implements the Galois/Counter Mode (GCM) operation for block ciphers.
+ *
  * @tparam CIPHER The cipher algorithm to be used (e.g., AES).
  */
 template<class CIPHER>
@@ -130,19 +136,17 @@ public:
 
     /**
      * @brief Encrypts data in GCM mode.
-     * @param p Pointer to the data to encrypt.
+     * @param[in,out] p Pointer to the data to encrypt. The encrypted data overwrites the original data.
      * @param len Length of the data to encrypt.
      * @return The authentication tag.
-     * @note The data pointed to by p is overwritten by the encrypted data.
      */
     std::array<unsigned char, 16> encrypt(unsigned char *p, size_t len);
 
     /**
      * @brief Decrypts data in GCM mode.
-     * @param p Pointer to the data to decrypt.
+     * @param[in,out] p Pointer to the data to decrypt. The decrypted data overwrites the original data.
      * @param len Length of the data to decrypt.
      * @return The authentication tag.
-     * @note The data pointed to by p is overwritten by the decrypted data.
      */
     std::array<unsigned char, 16> decrypt(unsigned char *p, size_t len);
 
@@ -153,10 +157,9 @@ protected:
 private:
     /**
      * @brief Applies XOR to the data using the encrypted IV and counter.
-     * @param p Pointer to the data.
+     * @param[in,out] p Pointer to the data. The data is modified in place.
      * @param len Length of the data.
      * @param ctr Counter value.
-     * @note The data pointed to by p is modified in place.
      */
     void xor_with_enc_iv_and_counter(unsigned char *p, size_t len, int ctr);
 
@@ -170,16 +173,14 @@ private:
 
     /**
      * @brief Doubles the value within GF(2^128).
-     * @param p Pointer to the value.
-     * @note The value is overwritten by the result.
+     * @param[in,out] p Pointer to the value. The doubled value overwrites the original value.
      */
     static void doub(unsigned char *p);
 
     /**
      * @brief Multiplies two values in GF(2^128).
-     * @param p Pointer to the first value.
+     * @param[in,out] p Pointer to the first value. The result overwrites the first value.
      * @param q Pointer to the second value.
-     * @note The first value pointed to by p is overwritten by the result.
      */
     static void gf_mul(unsigned char *p, const unsigned char *q);
 };

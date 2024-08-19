@@ -12,6 +12,7 @@
 
 /**
  * @brief SHA-1 (Secure Hash Algorithm 1) class.
+ *
  * This class provides functionalities for computing SHA-1 hashes.
  */
 class sha1 {
@@ -45,13 +46,13 @@ protected:
 private:
     /**
      * @brief Preprocesses the input data by padding and appending the length.
-     * @param v The input data to preprocess.
+     * @param[in,out] v The input data to preprocess.
      */
     static void preprocess(std::vector<unsigned char> &v);
 
     /**
      * @brief Processes a single 512-bit chunk of the input data.
-     * @param p Pointer to the chunk to process.
+     * @param[in,out] p Pointer to the chunk to process.
      */
     void process_chunk(unsigned char *p);
 };

@@ -9,7 +9,7 @@
 
 
 /**
- * @brief A struct representing the Diffie-Hellman key exchange protocol.
+ * @brief A struct representing the Diffie-Hellman Ephemeral.
  */
 struct diffie_hellman {
     mpz_class K;
@@ -30,7 +30,7 @@ struct diffie_hellman {
 
 
 /**
- * @brief Represents an elliptic curve field defined by the equation y^2 = x^3 + ax + b (mod mod).
+ * @brief Represents an elliptic curve field defined by the equation y^2 = x^3 + ax + b (modulo with the given modulus).
  */
 class ec_field {
 public:
@@ -69,6 +69,15 @@ struct ec_point : ec_field {
      */
     ec_point(const mpz_class &x, const mpz_class &y, const ec_field &f);
 
+    /**
+     * @brief Checks if the elliptic curve point is the identity element.
+     *
+     * The identity element (also known as the point at infinity) is a special point on the elliptic curve
+     * that acts as the neutral element for the addition operation. In this implementation, the identity
+     * element is represented by a point with the y-coordinate equal to the modulus of the field.
+     *
+     * @return True if the point is the identity element, false otherwise.
+     */
     [[nodiscard]]
     bool is_identity() const;
 

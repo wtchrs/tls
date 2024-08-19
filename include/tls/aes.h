@@ -8,6 +8,7 @@
 
 /**
  * @brief AES-128 (Advanced Encryption Standard) class.
+ *
  * This class provides functionalities for AES-128 encryption and decryption.
  */
 class aes128 {
@@ -20,13 +21,13 @@ public:
 
     /**
      * @brief Encrypts a 16-byte message.
-     * @param m The message to encrypt (16 bytes).
+     * @param[in,out] m The message to encrypt (16 bytes).
      */
     void encrypt(unsigned char *m) const;
 
     /**
      * @brief Decrypts a 16-byte message.
-     * @param m The message to decrypt (16 bytes).
+     * @param[in,out] m The message to decrypt (16 bytes).
      */
     void decrypt(unsigned char *m) const;
 
@@ -39,44 +40,44 @@ protected:
 private:
     /**
      * @brief Performs the ShiftRows step in AES encryption.
-     * @param msg The message to transform.
+     * @param[in,out] msg The message to transform.
      */
     static void shift_row(unsigned char *msg);
 
     /**
      * @brief Performs the inverse ShiftRows step in AES decryption.
-     * @param msg The message to transform.
+     * @param[in,out] msg The message to transform.
      */
     static void inv_shift_row(unsigned char *msg);
 
     /**
      * @brief Performs the SubBytes step in AES encryption.
-     * @param msg The message to transform.
+     * @param[in,out] msg The message to transform.
      */
     static void substitute(unsigned char *msg);
 
     /**
      * @brief Performs the inverse SubBytes step in AES decryption.
-     * @param msg The message to transform.
+     * @param[in,out] msg The message to transform.
      */
     static void inv_substitute(unsigned char *msg);
 
     /**
      * @brief Performs the MixColumns step in AES encryption.
-     * @param msg The message to transform.
+     * @param[in,out] msg The message to transform.
      */
     static void mix_column(unsigned char *msg);
 
     /**
      * @brief Performs the inverse MixColumns step in AES decryption.
-     * @param msg The message to transform.
+     * @param[in,out] msg The message to transform.
      */
     static void inv_mix_column(unsigned char *msg);
 
     /**
      * @brief Adds the round key to the message.
      * @param msg The message to transform.
-     * @param round The current round.
+     * @param[in,out] round The current round.
      */
     void add_round_key(unsigned char *msg, int round) const;
 

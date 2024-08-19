@@ -40,8 +40,8 @@ mpz_class random_prime(unsigned b);
  * @brief Converts an mpz_class number to a big endian array.
  * @tparam It Iterator type.
  * @param n The number to convert.
- * @param begin The beginning of the array.
- * @param end The end of the array.
+ * @param[out] begin The beginning of the array.
+ * @param[out] end The end of the array.
  */
 template<typename It>
 void mpz2bnd(mpz_class n, It begin, It end) {

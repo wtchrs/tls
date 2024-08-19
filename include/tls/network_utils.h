@@ -7,6 +7,11 @@
 
 #include <cstdint>
 
+/**
+ * @brief Converts a 32-bit integer from host byte order to network byte order (big-endian).
+ * @param hostlong The 32-bit integer in host byte order.
+ * @return The 32-bit integer in network byte order.
+ */
 inline uint32_t htonl(const uint32_t hostlong) {
     static constexpr uint32_t i = 1;
     if (*reinterpret_cast<const unsigned char *>(&i) == i) {
@@ -17,6 +22,11 @@ inline uint32_t htonl(const uint32_t hostlong) {
     return hostlong;
 }
 
+/**
+ * @brief Converts a 64-bit integer from host byte order to network byte order (big-endian).
+ * @param hostlong The 64-bit integer in host byte order.
+ * @return The 64-bit integer in network byte order.
+ */
 inline uint64_t htonl(const uint64_t hostlong) {
     static constexpr uint32_t i = 1;
     if (*reinterpret_cast<const unsigned char *>(&i) == i) {
