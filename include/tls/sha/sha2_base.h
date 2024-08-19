@@ -69,17 +69,6 @@ static uint64_t ssig1(const uint64_t x) {
 }
 
 
-template<typename T, bool condition, T t1, T t2>
-struct conditional_value {
-    static constexpr T value = t1;
-};
-
-template<typename T, T t1, T t2>
-struct conditional_value<T, false, t1, t2> {
-    static constexpr T value = t2;
-};
-
-
 /**
  * @brief Base class for SHA-2 (Secure Hash Algorithm 2) family.
  *
@@ -89,14 +78,14 @@ struct conditional_value<T, false, t1, t2> {
  * @tparam BLOCK_SIZE The block size in bytes.
  * @tparam OUTPUT_SIZE The output size in bytes.
  */
-template<class Derived, int BLOCK_SIZE, int OUTPUT_SIZE>
+template<class Derived, size_t BLOCK_SIZE, size_t OUTPUT_SIZE>
 class sha2_base {
 public:
     using BYTE = unsigned char;
     using WORD = std::conditional_t<BLOCK_SIZE == 64, uint32_t, uint64_t>;
 
     static constexpr size_t block_size = BLOCK_SIZE;
-    static constexpr size_t W_SIZE = conditional_value<size_t, BLOCK_SIZE == 64, 64, 80>::value;
+    static constexpr size_t W_SIZE = BLOCK_SIZE == 64 ? 64 : 80;
 
     sha2_base();
 
@@ -130,13 +119,13 @@ private:
     void process_chunk(BYTE *p);
 };
 
-template<class Derived, int BLOCK_SIZE, int OUTPUT_SIZE>
+template<class Derived, size_t BLOCK_SIZE, size_t OUTPUT_SIZE>
 sha2_base<Derived, BLOCK_SIZE, OUTPUT_SIZE>::sha2_base() {
     if (constexpr uint32_t k = 0x12345678; htonl(k) == k)
         big_endian = true;
 }
 
-template<class Derived, int BLOCK_SIZE, int OUTPUT_SIZE>
+template<class Derived, size_t BLOCK_SIZE, size_t OUTPUT_SIZE>
 template<class It>
 std::array<unsigned char, OUTPUT_SIZE> sha2_base<Derived, BLOCK_SIZE, OUTPUT_SIZE>::hash(It begin, It end) {
     auto *t = reinterpret_cast<Derived *>(this);
@@ -155,7 +144,7 @@ std::array<unsigned char, OUTPUT_SIZE> sha2_base<Derived, BLOCK_SIZE, OUTPUT_SIZ
     return digest;
 }
 
-template<class Derived, int BLOCK_SIZE, int OUTPUT_SIZE>
+template<class Derived, size_t BLOCK_SIZE, size_t OUTPUT_SIZE>
 void sha2_base<Derived, BLOCK_SIZE, OUTPUT_SIZE>::preprocess(std::vector<BYTE> &v) {
     const size_t len = v.size();
     v.push_back(0x80);
@@ -166,7 +155,7 @@ void sha2_base<Derived, BLOCK_SIZE, OUTPUT_SIZE>::preprocess(std::vector<BYTE> &
     mpz2bnd(static_cast<unsigned long>(len * 8), v.end() - BLOCK_SIZE / 8, v.end());
 }
 
-template<class Derived, int BLOCK_SIZE, int OUTPUT_SIZE>
+template<class Derived, size_t BLOCK_SIZE, size_t OUTPUT_SIZE>
 void sha2_base<Derived, BLOCK_SIZE, OUTPUT_SIZE>::process_chunk(BYTE *p) {
     auto *t = reinterpret_cast<Derived *>(this);
     // Prepare the message schedule W.

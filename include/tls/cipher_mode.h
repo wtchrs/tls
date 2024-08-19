@@ -13,14 +13,22 @@
 #include "mpz.h"
 
 
+template<typename Cipher>
+concept CIPHER = requires(Cipher c, const unsigned char *cp, unsigned char *p) {
+    { c.set_key(cp) };
+    { c.encrypt(p) };
+    { c.decrypt(p) };
+};
+
+
 /**
  * @brief Template class for cipher modes.
  *
  * This class provides a base for different cipher modes of operation.
  *
- * @tparam CIPHER The cipher algorithm to be used (e.g., aes128).
+ * @tparam Cipher The cipher algorithm to be used (e.g., aes128).
  */
-template<class CIPHER>
+template<CIPHER Cipher>
 class cipher_mode {
 public:
     /**
@@ -32,7 +40,7 @@ public:
     }
 
 protected:
-    CIPHER cipher; ///< The cipher algorithm instance
+    Cipher cipher; ///< The cipher algorithm instance
     unsigned char iv[16]; ///< The initialization vector
 };
 
@@ -42,10 +50,10 @@ protected:
  *
  * This class implements the CBC mode of operation for block ciphers.
  *
- * @tparam CIPHER The cipher algorithm to be used (e.g., AES).
+ * @tparam Cipher The cipher algorithm to be used (e.g., AES).
  */
-template<class CIPHER>
-class CBC : public cipher_mode<CIPHER> {
+template<CIPHER Cipher>
+class CBC : public cipher_mode<Cipher> {
 public:
     /**
      * @brief Sets the initialization vector (IV) for CBC mode.
@@ -68,13 +76,13 @@ public:
     void decrypt(unsigned char *p, size_t len) const;
 };
 
-template<class CIPHER>
-void CBC<CIPHER>::set_iv(const unsigned char *p) {
+template<CIPHER Cipher>
+void CBC<Cipher>::set_iv(const unsigned char *p) {
     memcpy(this->iv, p, 16);
 }
 
-template<class CIPHER>
-void CBC<CIPHER>::encrypt(unsigned char *p, const size_t len) const {
+template<CIPHER Cipher>
+void CBC<Cipher>::encrypt(unsigned char *p, const size_t len) const {
     assert(len % 16 == 0);
     for (int i = 0; i < 16; ++i)
         *(p + i) ^= this->iv[i];
@@ -87,8 +95,8 @@ void CBC<CIPHER>::encrypt(unsigned char *p, const size_t len) const {
     }
 }
 
-template<class CIPHER>
-void CBC<CIPHER>::decrypt(unsigned char *p, const size_t len) const {
+template<CIPHER Cipher>
+void CBC<Cipher>::decrypt(unsigned char *p, const size_t len) const {
     // Optimization is possible by applying parallelism
     assert(len % 16 == 0);
     std::vector<unsigned char> tmp{};
@@ -108,10 +116,10 @@ void CBC<CIPHER>::decrypt(unsigned char *p, const size_t len) const {
  *
  * This class implements the Galois/Counter Mode (GCM) operation for block ciphers.
  *
- * @tparam CIPHER The cipher algorithm to be used (e.g., AES).
+ * @tparam Cipher The cipher algorithm to be used (e.g., AES).
  */
-template<class CIPHER>
-class GCM : public cipher_mode<CIPHER> {
+template<CIPHER Cipher>
+class GCM : public cipher_mode<Cipher> {
 public:
     /**
      * @brief Sets the initialization vector (IV) for GCM mode.
@@ -185,20 +193,20 @@ private:
     static void gf_mul(unsigned char *p, const unsigned char *q);
 };
 
-template<class CIPHER>
-void GCM<CIPHER>::set_iv(const unsigned char *p) {
+template<CIPHER Cipher>
+void GCM<Cipher>::set_iv(const unsigned char *p) {
     // std::copy(p, p + 12, this->iv);
     std::copy_n(p, 12, this->iv);
 }
 
-template<class CIPHER>
-void GCM<CIPHER>::set_iv(const unsigned char *p, int offset, const size_t len) {
+template<CIPHER Cipher>
+void GCM<Cipher>::set_iv(const unsigned char *p, int offset, const size_t len) {
     // std::copy(p, p + len, this->iv + offset);
     std::copy_n(p, len, this->iv + offset);
 }
 
-template<class CIPHER>
-void GCM<CIPHER>::set_aad(const unsigned char *p, const size_t len) {
+template<CIPHER Cipher>
+void GCM<Cipher>::set_aad(const unsigned char *p, const size_t len) {
     aad = std::vector<unsigned char>{p, p + len};
     // Write the length of aad to the front of len_ac in big-endian format
     mpz2bnd(static_cast<unsigned long>(aad.size() * 8), len_ac, len_ac + 8);
@@ -206,23 +214,23 @@ void GCM<CIPHER>::set_aad(const unsigned char *p, const size_t len) {
         aad.push_back(0);
 }
 
-template<class CIPHER>
-std::array<unsigned char, 16> GCM<CIPHER>::encrypt(unsigned char *p, const size_t len) {
+template<CIPHER Cipher>
+std::array<unsigned char, 16> GCM<Cipher>::encrypt(unsigned char *p, const size_t len) {
     for (size_t i = 0; i < len; i += 16)
         xor_with_enc_iv_and_counter(p + i, std::min(static_cast<size_t>(16), len - i), i / 16 + 2);
     return generate_auth(p, len);
 }
 
-template<class CIPHER>
-std::array<unsigned char, 16> GCM<CIPHER>::decrypt(unsigned char *p, size_t len) {
+template<CIPHER Cipher>
+std::array<unsigned char, 16> GCM<Cipher>::decrypt(unsigned char *p, size_t len) {
     const auto auth = generate_auth(p, len);
     for (size_t i = 0; i < len; i += 16)
         xor_with_enc_iv_and_counter(p + 1, std::min(static_cast<size_t>(16), len - i), i / 16 + 2);
     return auth;
 }
 
-template<class CIPHER>
-void GCM<CIPHER>::xor_with_enc_iv_and_counter(unsigned char *p, const size_t len, const int ctr) {
+template<CIPHER Cipher>
+void GCM<Cipher>::xor_with_enc_iv_and_counter(unsigned char *p, const size_t len, const int ctr) {
     unsigned char iv_and_counter[16];
     std::copy(this->iv, this->iv + 12, iv_and_counter);
     mpz2bnd(ctr, iv_and_counter + 12, iv_and_counter + 16);
@@ -231,8 +239,8 @@ void GCM<CIPHER>::xor_with_enc_iv_and_counter(unsigned char *p, const size_t len
         p[i] ^= iv_and_counter[i];
 }
 
-template<class CIPHER>
-std::array<unsigned char, 16> GCM<CIPHER>::generate_auth(const unsigned char *p, const size_t len) {
+template<CIPHER Cipher>
+std::array<unsigned char, 16> GCM<Cipher>::generate_auth(const unsigned char *p, const size_t len) {
     // All operations are performed in GF(2^128) and may modify the operands in place.
     // clang-format off
     unsigned char H[16] = {0,};
@@ -271,8 +279,8 @@ std::array<unsigned char, 16> GCM<CIPHER>::generate_auth(const unsigned char *p,
     return auth;
 }
 
-template<class CIPHER>
-void GCM<CIPHER>::doub(unsigned char *p) {
+template<CIPHER Cipher>
+void GCM<Cipher>::doub(unsigned char *p) {
     const bool bit1 = p[15] & 1; // Check if the coefficient of x^127 is 1
     // Shift left by 1
     for (int i = 15; i > 0; --i) {
@@ -287,8 +295,8 @@ void GCM<CIPHER>::doub(unsigned char *p) {
         p[0] ^= 0xe1;
 }
 
-template<class CIPHER>
-void GCM<CIPHER>::gf_mul(unsigned char *p, const unsigned char *q) {
+template<CIPHER Cipher>
+void GCM<Cipher>::gf_mul(unsigned char *p, const unsigned char *q) {
     // clang-format off
     unsigned char r[16] = {0,};
     // clang-format on
