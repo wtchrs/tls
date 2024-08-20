@@ -41,7 +41,6 @@ public:
 
     /**
      * @brief Sets the key for HMAC.
-     *
      * @tparam It Iterator type for the key.
      * @param begin Iterator pointing to the beginning of the key.
      * @param end Iterator pointing to the end of the key.
@@ -51,11 +50,9 @@ public:
 
     /**
      * @brief Computes the HMAC of the input data.
-     *
      * @tparam It Iterator type for the input data.
      * @param begin Iterator pointing to the beginning of the input data.
      * @param end Iterator pointing to the end of the input data.
-     *
      * @return The HMAC as an array of bytes.
      */
     template<typename It>

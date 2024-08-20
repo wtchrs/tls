@@ -11,6 +11,7 @@
 
 /**
  * @brief Represents an ECDSA (Elliptic Curve Digital Signature Algorithm) class.
+ *
  * This class provides functionalities for signing and verifying messages using ECDSA.
  */
 class ecdsa_class : public ec_point {
