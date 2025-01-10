@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(custom_tls)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (MSVC)
@@ -20,6 +20,9 @@ pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
 
 file(GLOB_RECURSE SOURCES
         src/aes.cpp
+        src/base64.cpp
+        src/cert.cpp
+        src/der.cpp
         src/diffie_hellman.cpp
         src/ecdsa.cpp
         src/mpz.cpp
@@ -29,6 +32,8 @@ file(GLOB_RECURSE SOURCES
 
 file(GLOB_RECURSE TEST_SOURCES
         tests/aes.cpp
+        tests/base64.cpp
+        tests/cert.cpp
         tests/cipher_mode.cpp
         tests/diffie_hellman.cpp
         tests/ecdsa.cpp
@@ -47,9 +52,9 @@ target_link_libraries(custom_tls PRIVATE
         JsonCpp::JsonCpp
 )
 
-add_executable(catch2-test ${SOURCES} ${TEST_SOURCES})
-target_include_directories(catch2-test PUBLIC include)
-target_link_libraries(catch2-test PRIVATE
+add_executable(tests ${SOURCES} ${TEST_SOURCES})
+target_include_directories(tests PUBLIC include)
+target_link_libraries(tests PRIVATE
         PkgConfig::gmpxx
         PkgConfig::nettle
         PkgConfig::hogweed
@@ -57,9 +62,9 @@ target_link_libraries(catch2-test PRIVATE
         Catch2::Catch2
         Catch2::Catch2WithMain
 )
-target_compile_definitions(catch2-test PRIVATE TESTING)
+target_compile_definitions(tests PRIVATE TESTING)
 
 include(CTest)
 enable_testing()
 
-add_test(NAME Catch2Test COMMAND catch2-test)
+add_test(NAME Catch2Test COMMAND tests)
