@@ -28,9 +28,9 @@ TEST_CASE("Get certificate core") {
 }
 
 TEST_CASE("Parse integer DER") {
-    const unsigned char integer_der[] = {0x02, 0x01, 0x2A};
     const std::string expected = "2a:";
-    std::istringstream iss{std::string{reinterpret_cast<const char *>(integer_der)}};
+    const char *der_str = "\x02\x01\x2a";
+    std::istringstream iss{std::string{der_str}};
 
     auto parsed = der2json(iss);
 

@@ -10,6 +10,8 @@ else()
     add_compile_options(-Wall -Wextra)
 endif ()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 find_package(jsoncpp REQUIRED CONFIG)
 find_package(Catch2 REQUIRED CONFIG)
 

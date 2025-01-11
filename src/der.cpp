@@ -105,6 +105,18 @@ static std::optional<std::vector<unsigned char>> read_value(std::istream &is, co
     return v;
 }
 
+static std::optional<Json::Value> read_sub_value(std::istream &is, der::der_pc pc, der::der_tag tag, const size_t len) {
+    if (pc != der::PRIMITIVE) {
+        return read_constructed(is, len);
+    }
+
+    auto vec = read_value(is, len);
+    if (!vec) {
+        return std::nullopt;
+    }
+    return type_change(tag, *vec);
+}
+
 static Json::Value type_change(const der::der_tag tag, std::vector<unsigned char> v) {
     switch (tag) {
     case der::EOC:
@@ -141,13 +153,5 @@ static Json::Value type_change(const der::der_tag tag, std::vector<unsigned char
             ss << c;
         return ss.str();
     }
-    }
-}
-
-static std::optional<Json::Value> read_sub_value(std::istream &is, der::der_pc pc, der::der_tag tag, const size_t len) {
-    if (pc == der::PRIMITIVE) {
-        return read_value(is, len).transform([&](auto v) { return type_change(tag, v); });
-    } else {
-        return read_constructed(is, len);
     }
 }
