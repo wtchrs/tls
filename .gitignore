@@ -1,2 +1,11 @@
 build/
 .idea/
+
+# certificates
+cert/*
+!cert/example/
+certbot/
+
+# LSP
+.cache/
+compile_commands.json

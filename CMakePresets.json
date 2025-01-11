@@ -28,25 +28,25 @@
   ],
   "buildPresets": [
     {
-      "name": "build-debug",
+      "name": "debug",
       "configurePreset": "debug",
       "description": "Build the debug configuration"
     },
     {
-      "name": "build-release",
+      "name": "release",
       "configurePreset": "release",
       "description": "Build the release configuration"
     }
   ],
   "testPresets": [
     {
-      "name": "test-debug",
+      "name": "debug",
       "configurePreset": "debug",
       "output": {"outputOnFailure": true},
       "execution": {"noTestsAction": "error", "stopOnFailure": false}
     },
     {
-      "name": "test-release",
+      "name": "release",
       "configurePreset": "release",
       "output": {"outputOnFailure": true},
       "execution": {"noTestsAction": "error", "stopOnFailure": false}
