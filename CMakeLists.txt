@@ -41,6 +41,7 @@ file(GLOB_RECURSE TEST_SOURCES
         tests/ecdsa.cpp
         tests/hmac.cpp
         tests/mpz.cpp
+        tests/prf.cpp
         tests/rsa.cpp
         tests/sha.cpp
 )
