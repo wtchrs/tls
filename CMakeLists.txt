@@ -30,6 +30,7 @@ file(GLOB_RECURSE SOURCES
         src/mpz.cpp
         src/rsa.cpp
         src/sha1.cpp
+        src/tls.cpp
 )
 
 file(GLOB_RECURSE TEST_SOURCES

@@ -137,6 +137,10 @@ public:
 
     /**
      * @brief Sets the additional authenticated data (AAD) for GCM mode.
+     *
+     * This function is used to set the additional authenticated data (AAD) for GCM mode.
+     * In TLS, sequence number and TLS header are used as the AAD.
+     *
      * @param p Pointer to the AAD.
      * @param len Length of the AAD.
      */
