@@ -1,3 +1,7 @@
+#ifndef TLS_H
+#define TLS_H
+
+
 #include <cstdint>
 #include <gmpxx.h>
 #include <optional>
@@ -78,6 +82,8 @@ public:
 
     // ========== FOR HANDSHAKE ==========
 
+    // These methods behave differently depending on the SV template parameter.
+
     std::string client_hello(std::string &&s = "");
     std::string server_hello(std::string &&s = "");
     std::string server_certificate(std::string &&s = "");
@@ -87,7 +93,19 @@ public:
     std::string change_cipher_spec(std::string &&s = "");
     std::string finished(std::string &&s = "");
 
+    /**
+     * @brief Parse the alert message
+     * @param s The alert message to parse
+     * @return The parsed alert message
+     */
     int alert(std::string &&s = "");
+
+    /**
+     * @brief Generate an alert message
+     * @param level The level of the alert
+     * @param desc The alert type as code
+     * @return The alert message
+     */
     std::string alert(uint8_t level, uint8_t desc);
 
 protected:
@@ -97,3 +115,21 @@ private:
     void generate_signature(unsigned char *p_length, unsigned char *p);
     void derive_keys(mpz_class premaster_secret);
 };
+
+enum tls_type { CHANGE_CIPHER_SPEC = 0x14, ALERT = 0x15, HANDSHAKE = 0x16, APPLICATION_DATA = 0x17 };
+
+enum tls_handshake_type {
+    HELLO_REQUEST = 0x00,
+    CLIENT_HELLO = 0x01,
+    SERVER_HELLO = 0x02,
+    CERTIFICATE = 0x0b,
+    SERVER_KEY_EXCHANGE = 0x0c,
+    CERTIFICATE_REQUEST = 0x0d,
+    SERVER_DONE = 0x0e,
+    CERTIFICATE_VERIFY = 0x0f,
+    CLIENT_KEY_EXCHANGE = 0x10,
+    FINISHED = 0x14
+};
+
+
+#endif

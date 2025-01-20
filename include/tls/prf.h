@@ -1,3 +1,7 @@
+#ifndef PRF_H
+#define PRF_H
+
+
 #include <algorithm>
 #include "tls/hmac.h"
 
@@ -101,3 +105,6 @@ std::vector<unsigned char> prf<Hash>::get_n_bytes(size_t n) {
     r.resize(n);
     return r;
 }
+
+
+#endif
