@@ -85,6 +85,7 @@ public:
     using WORD = std::conditional_t<BLOCK_SIZE == 64, uint32_t, uint64_t>;
 
     static constexpr size_t block_size = BLOCK_SIZE;
+    static constexpr size_t output_size = OUTPUT_SIZE;
     static constexpr size_t W_SIZE = BLOCK_SIZE == 64 ? 64 : 80;
 
     sha2_base();
