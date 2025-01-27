@@ -112,7 +112,7 @@ protected:
     std::string accumulate(const std::string &s);
 
 private:
-    void generate_signature(unsigned char *p_length, unsigned char *p);
+    void generate_signature(unsigned char *pub_key, unsigned char *sign);
     void derive_keys(mpz_class premaster_secret);
 };
 
