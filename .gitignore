@@ -6,6 +6,7 @@ cert/*
 !cert/example/
 certbot/
 
-# LSP
+# LSP and IDE
 .cache/
 compile_commands.json
+.vscode/

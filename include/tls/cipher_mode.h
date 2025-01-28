@@ -86,7 +86,7 @@ void CBC<Cipher>::encrypt(unsigned char *p, const size_t len) const {
         *(p + i) ^= this->iv_[i];
     this->cipher_.encrypt(p);
     p += 16;
-    for (int i = 0; i < len / 16 - 1; ++i, p += 16) {
+    for (size_t i = 0; i < len / 16 - 1; ++i, p += 16) {
         for (int j = 0; j < 16; ++j)
             *(p + j) ^= *(p - 16 + j);
         this->cipher_.encrypt(p);
@@ -100,11 +100,11 @@ void CBC<Cipher>::decrypt(unsigned char *p, const size_t len) const {
     std::vector<unsigned char> tmp{};
     tmp.resize(len);
     std::copy_n(p, len, &tmp[0]);
-    for (int i = 0; i < len; i += 16)
+    for (size_t i = 0; i < len; i += 16)
         this->cipher_.decrypt(p + i);
-    for (int i = 0; i < 16; ++i)
+    for (size_t i = 0; i < 16; ++i)
         *p++ ^= this->iv_[i];
-    for (int i = 0; i < len - 16; ++i)
+    for (size_t i = 0; i < len - 16; ++i)
         *p++ ^= tmp[i];
 }
 
@@ -237,7 +237,7 @@ void GCM<Cipher>::xor_with_enc_iv_and_counter(unsigned char *p, const size_t len
     std::copy(this->iv_, this->iv_ + 12, iv_and_counter);
     mpz2bnd(ctr, iv_and_counter + 12, iv_and_counter + 16);
     this->cipher_.encrypt(iv_and_counter);
-    for (int i = 0; i < len; ++i)
+    for (size_t i = 0; i < len; ++i)
         p[i] ^= iv_and_counter[i];
 }
 
@@ -253,7 +253,7 @@ std::array<unsigned char, 16> GCM<Cipher>::generate_auth(const unsigned char *p,
 
     if (!aad_.empty()) {
         gf_mul(&aad_[0], H); // Multiply the AAD by H.
-        for (int i = 0; i < aad_.size() - 16; i += 16) {
+        for (size_t i = 0; i < aad_.size() - 16; i += 16) {
             // XOR the next 16 bytes with previous ones and multiply by H.
             for (int j = 0; j < 16; ++j)
                 aad_[i + 16 + j] ^= aad_[i + j];
@@ -263,7 +263,7 @@ std::array<unsigned char, 16> GCM<Cipher>::generate_auth(const unsigned char *p,
         std::copy(aad_.end() - 16, aad_.end(), auth.begin());
     }
 
-    for (int i = 0; i < len; i += 16) {
+    for (size_t i = 0; i < len; i += 16) {
         // XOR the current ciphertext block with auth and multiply H.
         for (size_t j = 0; j < std::min(static_cast<size_t>(16), len - i); ++j)
             auth[j] ^= p[i + j];
