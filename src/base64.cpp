@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/21/2024.
-//
-
 #include "tls/base64.h"
 
 static char b2c(const unsigned char n) {

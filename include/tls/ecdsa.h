@@ -1,9 +1,6 @@
-//
-// Created by wtchr on 8/8/2024.
-//
-
 #ifndef ECDSA_H
 #define ECDSA_H
+
 
 #include <gmpxx.h>
 #include "diffie_hellman.h"
@@ -14,14 +11,20 @@
  *
  * This class provides functionalities for signing and verifying messages using ECDSA.
  */
-class ecdsa_class : public ec_point {
+class ECDSA : public ECPoint {
+protected:
+    mpz_class n_; // The order of the generator point.
+
+private:
+    size_t n_bit_;
+
 public:
     /**
      * @brief Constructs an ECDSA object with the given generator point and order.
      * @param G The generator point on the elliptic curve.
      * @param n The order of the generator point.
      */
-    ecdsa_class(const ec_point &G, mpz_class n);
+    ECDSA(const ECPoint &G, mpz_class n);
 
     /**
      * @brief Computes the modular inverse of a given value.
@@ -48,13 +51,7 @@ public:
      * @return True if the signature is valid, false otherwise.
      */
     [[nodiscard]]
-    bool verify(const mpz_class &m, const std::pair<mpz_class, mpz_class> &sig, const ec_point &Q) const;
-
-protected:
-    mpz_class n; ///< The order of the generator point.
-
-private:
-    size_t n_bit;
+    bool verify(const mpz_class &m, const std::pair<mpz_class, mpz_class> &sig, const ECPoint &Q) const;
 };
 
 

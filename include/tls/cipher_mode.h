@@ -1,13 +1,11 @@
-//
-// Created by wtchr on 8/10/2024.
-//
-
 #ifndef CIPHER_MODE_H
 #define CIPHER_MODE_H
+
 
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstring>
 #include <vector>
 #include "mpz.h"
@@ -29,19 +27,19 @@ concept CIPHER = requires(Cipher c, const unsigned char *cp, unsigned char *p) {
  * @tparam Cipher The cipher algorithm to be used (e.g., aes128).
  */
 template<CIPHER Cipher>
-class cipher_mode {
+class CipherMode {
+protected:
+    Cipher cipher_; // The cipher algorithm instance
+    unsigned char iv_[16]; // The initialization vector
+
 public:
     /**
      * @brief Sets the encryption key for the cipher.
      * @param p Pointer to the key.
      */
     void set_key(const unsigned char *p) {
-        cipher.set_key(p);
+        cipher_.set_key(p);
     }
-
-protected:
-    Cipher cipher; ///< The cipher algorithm instance
-    unsigned char iv[16]; ///< The initialization vector
 };
 
 
@@ -53,7 +51,7 @@ protected:
  * @tparam Cipher The cipher algorithm to be used (e.g., AES).
  */
 template<CIPHER Cipher>
-class CBC : public cipher_mode<Cipher> {
+class CBC : public CipherMode<Cipher> {
 public:
     /**
      * @brief Sets the initialization vector (IV) for CBC mode.
@@ -78,20 +76,20 @@ public:
 
 template<CIPHER Cipher>
 void CBC<Cipher>::set_iv(const unsigned char *p) {
-    memcpy(this->iv, p, 16);
+    std::copy_n(p, 16, this->iv_);
 }
 
 template<CIPHER Cipher>
 void CBC<Cipher>::encrypt(unsigned char *p, const size_t len) const {
     assert(len % 16 == 0);
     for (int i = 0; i < 16; ++i)
-        *(p + i) ^= this->iv[i];
-    this->cipher.encrypt(p);
+        *(p + i) ^= this->iv_[i];
+    this->cipher_.encrypt(p);
     p += 16;
     for (int i = 0; i < len / 16 - 1; ++i, p += 16) {
         for (int j = 0; j < 16; ++j)
             *(p + j) ^= *(p - 16 + j);
-        this->cipher.encrypt(p);
+        this->cipher_.encrypt(p);
     }
 }
 
@@ -101,11 +99,11 @@ void CBC<Cipher>::decrypt(unsigned char *p, const size_t len) const {
     assert(len % 16 == 0);
     std::vector<unsigned char> tmp{};
     tmp.resize(len);
-    memcpy(&tmp[0], p, len);
+    std::copy_n(p, len, &tmp[0]);
     for (int i = 0; i < len; i += 16)
-        this->cipher.decrypt(p + i);
+        this->cipher_.decrypt(p + i);
     for (int i = 0; i < 16; ++i)
-        *p++ ^= this->iv[i];
+        *p++ ^= this->iv_[i];
     for (int i = 0; i < len - 16; ++i)
         *p++ ^= tmp[i];
 }
@@ -119,7 +117,11 @@ void CBC<Cipher>::decrypt(unsigned char *p, const size_t len) const {
  * @tparam Cipher The cipher algorithm to be used (e.g., AES).
  */
 template<CIPHER Cipher>
-class GCM : public cipher_mode<Cipher> {
+class GCM : public CipherMode<Cipher> {
+protected:
+    std::vector<unsigned char> aad_; // Additional authenticated data
+    unsigned char len_ac_[16]; // Length of AAD and ciphertext in big-endian format
+
 public:
     /**
      * @brief Sets the initialization vector (IV) for GCM mode.
@@ -158,10 +160,6 @@ public:
      */
     std::array<unsigned char, 16> decrypt(unsigned char *p, size_t len);
 
-protected:
-    std::vector<unsigned char> aad; ///< Additional authenticated data
-    unsigned char len_ac[16]; ///< Length of AAD and ciphertext in big-endian format
-
 private:
     /**
      * @brief Applies XOR to the data using the encrypted IV and counter.
@@ -196,22 +194,22 @@ private:
 template<CIPHER Cipher>
 void GCM<Cipher>::set_iv(const unsigned char *p) {
     // std::copy(p, p + 12, this->iv);
-    std::copy_n(p, 12, this->iv);
+    std::copy_n(p, 12, this->iv_);
 }
 
 template<CIPHER Cipher>
 void GCM<Cipher>::set_iv(const unsigned char *p, int offset, const size_t len) {
     // std::copy(p, p + len, this->iv + offset);
-    std::copy_n(p, len, this->iv + offset);
+    std::copy_n(p, len, this->iv_ + offset);
 }
 
 template<CIPHER Cipher>
 void GCM<Cipher>::set_aad(const unsigned char *p, const size_t len) {
-    aad = std::vector<unsigned char>{p, p + len};
+    aad_ = std::vector<unsigned char>{p, p + len};
     // Write the length of aad to the front of len_ac in big-endian format
-    mpz2bnd(static_cast<unsigned long>(aad.size() * 8), len_ac, len_ac + 8);
-    while (aad.size() % 16)
-        aad.push_back(0);
+    mpz2bnd(static_cast<unsigned long>(aad_.size() * 8), len_ac_, len_ac_ + 8);
+    while (aad_.size() % 16)
+        aad_.push_back(0);
 }
 
 template<CIPHER Cipher>
@@ -232,9 +230,9 @@ std::array<unsigned char, 16> GCM<Cipher>::decrypt(unsigned char *p, size_t len)
 template<CIPHER Cipher>
 void GCM<Cipher>::xor_with_enc_iv_and_counter(unsigned char *p, const size_t len, const int ctr) {
     unsigned char iv_and_counter[16];
-    std::copy(this->iv, this->iv + 12, iv_and_counter);
+    std::copy(this->iv_, this->iv_ + 12, iv_and_counter);
     mpz2bnd(ctr, iv_and_counter + 12, iv_and_counter + 16);
-    this->cipher.encrypt(iv_and_counter);
+    this->cipher_.encrypt(iv_and_counter);
     for (int i = 0; i < len; ++i)
         p[i] ^= iv_and_counter[i];
 }
@@ -247,32 +245,32 @@ std::array<unsigned char, 16> GCM<Cipher>::generate_auth(const unsigned char *p,
     // clang-format on
     std::array<unsigned char, 16> auth{};
     // Generate H by encrypting the all-zero block by the cipher.
-    this->cipher.encrypt(H);
+    this->cipher_.encrypt(H);
 
-    if (!aad.empty()) {
-        gf_mul(&aad[0], H); // Multiply the AAD by H.
-        for (int i = 0; i < aad.size() - 16; i += 16) {
+    if (!aad_.empty()) {
+        gf_mul(&aad_[0], H); // Multiply the AAD by H.
+        for (int i = 0; i < aad_.size() - 16; i += 16) {
             // XOR the next 16 bytes with previous ones and multiply by H.
             for (int j = 0; j < 16; ++j)
-                aad[i + 16 + j] ^= aad[i + j];
-            gf_mul(&aad[i + 16], H);
+                aad_[i + 16 + j] ^= aad_[i + j];
+            gf_mul(&aad_[i + 16], H);
         }
         // Use the last result to generate the authentication tag.
-        std::copy(aad.end() - 16, aad.end(), auth.begin());
+        std::copy(aad_.end() - 16, aad_.end(), auth.begin());
     }
 
     for (int i = 0; i < len; i += 16) {
         // XOR the current ciphertext block with auth and multiply H.
-        for (int j = 0; j < std::min(static_cast<size_t>(16), len - i); ++j)
+        for (size_t j = 0; j < std::min(static_cast<size_t>(16), len - i); ++j)
             auth[j] ^= p[i + j];
         gf_mul(&auth[0], H);
     }
 
     // Write the length of ciphertext to the end of len_ac in big-endian format.
-    mpz2bnd(static_cast<unsigned long>(len * 8), len_ac + 8, len_ac + 16);
+    mpz2bnd(static_cast<unsigned long>(len * 8), len_ac_ + 8, len_ac_ + 16);
     // XOR len_ac with auth and multiply by H.
     for (int i = 0; i < 16; ++i)
-        auth[i] ^= len_ac[i];
+        auth[i] ^= len_ac_[i];
     gf_mul(&auth[0], H);
 
     xor_with_enc_iv_and_counter(&auth[0], 16, 1);

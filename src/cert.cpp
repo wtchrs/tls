@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/21/2024.
-//
-
 #include "tls/cert.h"
 
 std::string get_certificate_core(std::istream &is) {

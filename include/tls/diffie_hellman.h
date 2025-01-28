@@ -1,9 +1,6 @@
-//
-// Created by wtchr on 8/5/2024.
-//
-
 #ifndef DIFFIE_HELLMAN_H
 #define DIFFIE_HELLMAN_H
+
 
 #include <gmpxx.h>
 
@@ -11,14 +8,14 @@
 /**
  * @brief A struct representing the Diffie-Hellman Ephemeral.
  */
-struct diffie_hellman {
-    mpz_class K;
-    const mpz_class p, g, x, y;
+struct DiffieHellman {
+    mpz_class K_;
+    const mpz_class p_, g_, x_, y_;
 
     /**
      * @brief Constructs a new diffie_hellman object and initializes the parameters.
      */
-    diffie_hellman();
+    DiffieHellman();
 
     /**
      * @brief Computes and sets the shared secret key from peer's public key.
@@ -32,7 +29,10 @@ struct diffie_hellman {
 /**
  * @brief Represents an elliptic curve field defined by the equation y^2 = x^3 + ax + b (modulo with the given modulus).
  */
-class ec_field {
+class ECField {
+protected:
+    mpz_class a_, b_, mod_;
+
 public:
     /**
      * @brief Constructs an elliptic curve field with the given parameters.
@@ -40,11 +40,9 @@ public:
      * @param b The coefficient b in the elliptic curve equation.
      * @param mod The modulus for the field.
      */
-    ec_field(const mpz_class &a, const mpz_class &b, const mpz_class &mod);
+    ECField(const mpz_class &a, const mpz_class &b, const mpz_class &mod);
 
 protected:
-    mpz_class a, b, mod;
-
     /**
      * @brief Computes the modular inverse of a given value.
      * @param z The value to compute the modular inverse of.
@@ -58,8 +56,9 @@ protected:
 /**
  * @brief Represents a point on an elliptic curve.
  */
-struct ec_point : ec_field {
-    mpz_class x, y;
+class ECPoint : ECField {
+public:
+    mpz_class x_, y_;
 
     /**
      * @brief Constructs an elliptic curve point with the given coordinates and field.
@@ -67,7 +66,7 @@ struct ec_point : ec_field {
      * @param y The y-coordinate of the point.
      * @param f The elliptic curve field.
      */
-    ec_point(const mpz_class &x, const mpz_class &y, const ec_field &f);
+    ECPoint(const mpz_class &x, const mpz_class &y, const ECField &f);
 
     /**
      * @brief Checks if the elliptic curve point is the identity element.
@@ -86,14 +85,14 @@ struct ec_point : ec_field {
      * @param r The point to add.
      * @return The result of the addition.
      */
-    ec_point operator+(const ec_point &r) const;
+    ECPoint operator+(const ECPoint &r) const;
 
     /**
      * @brief Checks if two elliptic curve points are equal.
      * @param r The point to compare with.
      * @return True if the points are equal, false otherwise.
      */
-    bool operator==(const ec_point &r) const;
+    bool operator==(const ECPoint &r) const;
 
     /**
      * @brief Multiplies an elliptic curve point by a scalar.
@@ -101,7 +100,7 @@ struct ec_point : ec_field {
      * @param p The point to multiply.
      * @return The result of the multiplication.
      */
-    friend ec_point operator*(const mpz_class &l, const ec_point &p);
+    friend ECPoint operator*(const mpz_class &l, const ECPoint &p);
 
     /**
      * @brief Outputs the coordinates of the elliptic curve point to the given output stream.
@@ -109,7 +108,7 @@ struct ec_point : ec_field {
      * @param r The elliptic curve point to output.
      * @return The output stream with the point's coordinates written to it.
      */
-    friend std::ostream &operator<<(std::ostream &os, const ec_point &r);
+    friend std::ostream &operator<<(std::ostream &os, const ECPoint &r);
 };
 
 

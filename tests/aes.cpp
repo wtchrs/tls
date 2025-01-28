@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/9/2024.
-//
-
 #include "tls/aes.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -9,23 +5,23 @@
 class aes128_test {
 public:
     static void shift_row(unsigned char *msg) {
-        aes128::shift_row(msg);
+        AES128::shift_row(msg);
     }
 
     static void inv_shift_row(unsigned char *msg) {
-        aes128::inv_shift_row(msg);
+        AES128::inv_shift_row(msg);
     }
 
     static void mix_column(unsigned char *msg) {
-        aes128::mix_column(msg);
+        AES128::mix_column(msg);
     }
 
     static void inv_mix_column(unsigned char *msg) {
-        aes128::inv_mix_column(msg);
+        AES128::inv_mix_column(msg);
     }
 
-    static const unsigned char *get_schedule(const aes128 &aes) {
-        return aes.schedule[0];
+    static const unsigned char *get_schedule(const AES128 &aes) {
+        return aes.schedule_[0];
     }
 };
 
@@ -72,13 +68,13 @@ unsigned char schedule[11 * 16] = {
 };
 
 TEST_CASE("Key scheduling") {
-    aes128 aes; // NOLINT(*-pro-type-member-init)
+    AES128 aes; // NOLINT(*-pro-type-member-init)
     aes.set_key(schedule);
     REQUIRE(std::equal(schedule, schedule + 11 * 16, aes128_test::get_schedule(aes)));
 }
 
 TEST_CASE("Encrypt and Decrypt") {
-    aes128 aes; // NOLINT(*-pro-type-member-init)
+    AES128 aes; // NOLINT(*-pro-type-member-init)
     const unsigned char key[16] = {0, 9, 13, 11, 11, 14, 9, 13, 13, 11, 14, 9, 9, 13, 11, 14};
     const unsigned char original[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     unsigned char block[16];

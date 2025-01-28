@@ -1,9 +1,6 @@
-//
-// Created by wtchr on 8/13/2024.
-//
-
 #ifndef SHA_H
 #define SHA_H
+
 
 #include <array>
 #include <vector>
@@ -15,15 +12,25 @@
  *
  * This class provides functionalities for computing SHA-1 hashes.
  */
-class sha1 {
+class SHA1 {
 public:
-    static constexpr size_t block_size = 64; ///< Block size in bytes
-    static constexpr size_t output_size = 20; ///< Output size in bytes
+    static constexpr size_t block_size = 64; // Block size in bytes
+    static constexpr size_t output_size = 20; // Output size in bytes
 
+protected:
+    bool big_endian_ = false; // Indicates if the system is big-endian.
+    uint32_t h_[5], w_[80]; // Internal state and message schedule array.
+
+    /** Initial hash values */
+    static constexpr uint32_t h_stored_value[5] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0};
+    /** Round constants */
+    static constexpr uint32_t k[4] = {0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6};
+
+public:
     /**
      * @brief Constructs a SHA-1 object.
      */
-    sha1();
+    SHA1();
 
     /**
      * @brief Computes the SHA-1 hash of the input data.
@@ -34,14 +41,6 @@ public:
      */
     template<class It>
     std::array<unsigned char, output_size> hash(It begin, It end);
-
-protected:
-    bool big_endian = false; ///< Indicates if the system is big-endian.
-    uint32_t h[5], w[80]; ///< Internal state and message schedule array.
-    // Initial hash values
-    static constexpr uint32_t h_stored_value[5] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0};
-    // Round constants
-    static constexpr uint32_t k[4] = {0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6};
 
 private:
     /**
@@ -58,18 +57,18 @@ private:
 };
 
 template<class It>
-std::array<unsigned char, sha1::output_size> sha1::hash(It begin, It end) {
+std::array<unsigned char, SHA1::output_size> SHA1::hash(It begin, It end) {
     for (int i = 0; i < 5; ++i)
-        h[i] = h_stored_value[i];
+        h_[i] = h_stored_value[i];
     std::vector<unsigned char> msg{begin, end};
     preprocess(msg);
-    for (int i = 0; i < msg.size(); i += block_size)
+    for (size_t i = 0; i < msg.size(); i += block_size)
         process_chunk(&msg[i]);
-    if (!big_endian)
-        for (auto &p : h)
+    if (!big_endian_)
+        for (auto &p : h_)
             p = htonl(p);
     std::array<unsigned char, output_size> digest{};
-    auto *p = reinterpret_cast<unsigned char *>(h);
+    auto *p = reinterpret_cast<unsigned char *>(h_);
     for (int i = 0; i < 20; ++i, ++p)
         digest[i] = *p;
     return digest;

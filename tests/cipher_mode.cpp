@@ -1,14 +1,10 @@
-//
-// Created by wtchr on 8/10/2024.
-//
-
 #include "tls/cipher_mode.h"
 #include <catch2/catch_test_macros.hpp>
 #include <nettle/gcm.h>
 #include "tls/aes.h"
 
 TEST_CASE("CBC") {
-    CBC<aes128> cbc;
+    CBC<AES128> cbc;
     const unsigned char key[16] = {0, 9, 13, 11, 11, 14, 9, 13, 13, 11, 14, 9, 9, 13, 11, 14};
     const unsigned char iv[16] = {14, 21, 13, 11, 11, 7, 9, 13, 0, 11, 14, 9, 9, 13, 11, 14};
     cbc.set_key(key);
@@ -42,7 +38,7 @@ TEST_CASE("GCM") {
         gcm_aes128_encrypt(&ctx, 48, C, P);
         gcm_aes128_digest(&ctx, 16, Z);
 
-        GCM<aes128> gcm;
+        GCM<AES128> gcm;
         gcm.set_iv(IV);
         gcm.set_key(K);
         gcm.set_aad(A, 28);
