@@ -50,7 +50,7 @@ template<bool SV>
 std::string TLS<SV>::certificate_ = init_certificate();
 
 template<bool SV>
-rsa_class TLS<SV>::rsa_{ze, zd, zK};
+RSA TLS<SV>::rsa_{ze, zd, zK};
 
 // Pack structs to 1 byte alignment to avoid padding
 #pragma pack(push, 1)
@@ -368,8 +368,8 @@ std::string TLS<SV>::server_certificate(std::string &&s) {
             return alert(2, 44);
         }
         auto [K, e, sign] = *opt_pubkey;
-        rsa_.K = K;
-        rsa_.e = e;
+        rsa_.K_ = K;
+        rsa_.e_ = e;
         return "";
     }
 }
@@ -384,7 +384,7 @@ void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) {
     std::copy(server_random_.cbegin(), server_random_.cend(), message_to_hash);
     std::copy(client_random_.cbegin(), client_random_.cend(), message_to_hash + RANDOM_SIZE);
     std::copy_n(pub_key, 69, message_to_hash + RANDOM_SIZE * 2);
-    sha256 sha;
+    SHA256 sha;
     auto hash = sha.hash(message_to_hash, message_to_hash + MESSAGE_TO_HASH_SIZE); // Result size is 32 bytes.
 
     // Prepare PKCS#1 v1.5 padding structure.
@@ -417,7 +417,7 @@ template<bool SV>
 void TLS<SV>::derive_keys(mpz_class premaster_secret) {
     unsigned char pre[32], rand[64];
     mpz2bnd(premaster_secret, pre, pre + 32);
-    prf<sha256> p;
+    PRF<SHA256> p;
     p.secret(pre, pre + 32);
     std::copy(client_random_.cbegin(), client_random_.cend(), rand);
     std::copy(server_random_.cbegin(), server_random_.cend(), rand + 32);
@@ -444,8 +444,8 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
         msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
         msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
         msg.handshake.handshake_type = tls_handshake_type::SERVER_KEY_EXCHANGE;
-        mpz2bnd(P_.x, msg.x, msg.x + 32);
-        mpz2bnd(P_.y, msg.y, msg.y + 32);
+        mpz2bnd(P_.x_, msg.x, msg.x + 32);
+        mpz2bnd(P_.y_, msg.y, msg.y + 32);
         generate_signature(&msg.named_curve, msg.sign);
         return accumulate(struct2str(msg));
     } else {
@@ -456,9 +456,9 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
         accumulate(s);
         auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
         // Extract server's ephemeral public key from received message.
-        ec_point Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
+        ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
         // Compute shared key.
-        derive_keys((prv_key_ * Y).x);
+        derive_keys((prv_key_ * Y).x_);
 
         // Check signature.
         auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + 256));
@@ -468,7 +468,7 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
         std::copy(client_random_.cbegin(), client_random_.cend(), check_hash);
         std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + 32);
         std::copy_n(&p->named_curve, 69, check_hash + 64);
-        sha256 sha;
+        SHA256 sha;
         auto hash = sha.hash(check_hash, check_hash + 133);
 
         if (std::equal(check_sig + 224, check_sig + 256, hash.begin())) {
@@ -505,9 +505,9 @@ std::string TLS<SV>::client_key_exchange(std::string &&s) {
         }
         accumulate(s);
         auto p = (client_key_exchange_message *) s.data();
-        ec_point Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
+        ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
         // Compute shared key.
-        derive_keys((prv_key_ * Y).x);
+        derive_keys((prv_key_ * Y).x_);
         return "";
     } else {
         // client
@@ -515,8 +515,8 @@ std::string TLS<SV>::client_key_exchange(std::string &&s) {
         msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
         msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
         // Fill with client's public key coordinates.
-        mpz2bnd(P_.x, msg.x, msg.x + 32);
-        mpz2bnd(P_.y, msg.y, msg.y + 32);
+        mpz2bnd(P_.x_, msg.x, msg.x + 32);
+        mpz2bnd(P_.y_, msg.y, msg.y + 32);
         return accumulate(struct2str(msg));
     }
 }
@@ -539,8 +539,8 @@ std::string TLS<SV>::change_cipher_spec(std::string &&s) {
 
 template<bool SV>
 std::string TLS<SV>::finished(std::string &&s) {
-    prf<sha256> prf;
-    sha256 sha;
+    PRF<SHA256> prf;
+    SHA256 sha;
     prf.secret(master_secret_.cbegin(), master_secret_.cend());
     auto hash = sha.hash(accumulated_handshakes_.cbegin(), accumulated_handshakes_.cend());
     prf.seed(hash.cbegin(), hash.cend());

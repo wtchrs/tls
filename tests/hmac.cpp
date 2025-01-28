@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/16/2024.
-//
-
 #include "tls/hmac.h"
 #include <catch2/catch_test_macros.hpp>
 
@@ -29,7 +25,7 @@ TEST_CASE("HMAC-SHA1") {
     // constexpr size_t data_len[] = {34, 34, 34, 54};
     constexpr size_t key_len[] = {64, 20, 100, 49};
 
-    hmac<sha1> hmac;
+    HMAC<SHA1> hmac;
     for (int i = 0; i < 4; ++i) {
         unsigned char nkey[100], nresult[20];
         mpz2bnd(mpz_class{key[i]}, nkey, nkey + key_len[i]);

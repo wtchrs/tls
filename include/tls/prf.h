@@ -16,9 +16,9 @@
  * @tparam Hash The hash function to be used (must satisfy HashFunction concept)
  */
 template<HashFunction Hash>
-class prf {
+class PRF {
 private:
-    hmac<Hash> hmac_; ///< HMAC object
+    HMAC<Hash> hmac_; ///< HMAC object
     std::vector<unsigned char> label_, seed_; ///< Label and seed data
 
 public:
@@ -67,12 +67,12 @@ public:
 
 template<HashFunction Hash>
 template<typename IT>
-void prf<Hash>::secret(const IT begin, const IT end) {
+void PRF<Hash>::secret(const IT begin, const IT end) {
     hmac_.key(begin, end);
 }
 
 template<HashFunction Hash>
-void prf<Hash>::label(const char *p) {
+void PRF<Hash>::label(const char *p) {
     label_.clear();
     while (*p) {
         label_.push_back(*p++);
@@ -81,7 +81,7 @@ void prf<Hash>::label(const char *p) {
 
 template<HashFunction Hash>
 template<typename IT>
-void prf<Hash>::seed(const IT begin, const IT end) {
+void PRF<Hash>::seed(const IT begin, const IT end) {
     seed_.clear();
     for (IT it = begin; it != end; ++it) {
         seed_.push_back(*it);
@@ -89,7 +89,7 @@ void prf<Hash>::seed(const IT begin, const IT end) {
 }
 
 template<HashFunction Hash>
-std::vector<unsigned char> prf<Hash>::get_n_bytes(size_t n) {
+std::vector<unsigned char> PRF<Hash>::get_n_bytes(size_t n) {
     // seed = A(0) = label_ + seed_
     auto seed = label_;
     seed.insert(seed.end(), seed_.cbegin(), seed_.cend());

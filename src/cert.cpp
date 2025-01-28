@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/21/2024.
-//
-
 #include "tls/cert.h"
 #include <array>
 #include <gmpxx.h>

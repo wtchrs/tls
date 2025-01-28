@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/20/2024.
-//
-
 #include "tls/der.h"
 
 #include <ios>
@@ -11,11 +7,11 @@
 #include <vector>
 #include "tls/mpz.h"
 
-static der::der_type read_type(const unsigned char c);
+static der::Type read_type(const unsigned char c);
 static std::optional<size_t> read_length(std::istream &is);
 static std::optional<std::vector<unsigned char>> read_value(std::istream &is, const size_t len);
-static Json::Value type_change(const der::der_tag tag, std::vector<unsigned char> v);
-static std::optional<Json::Value> read_sub_value(std::istream &is, der::der_pc pc, der::der_tag tag, const size_t len);
+static Json::Value type_change(const der::Tag tag, std::vector<unsigned char> v);
+static std::optional<Json::Value> read_sub_value(std::istream &is, der::PC pc, der::Tag tag, const size_t len);
 static std::optional<Json::Value> read_constructed(std::istream &is, const size_t len);
 
 std::optional<Json::Value> der2json(std::istream &is) {
@@ -68,11 +64,11 @@ static std::optional<Json::Value> read_constructed(std::istream &is, const size_
     return json_value;
 }
 
-static der::der_type read_type(const unsigned char c) {
+static der::Type read_type(const unsigned char c) {
     return {
-            static_cast<der::der_class>((c & 0xc0) >> 6),
-            static_cast<der::der_pc>((c & 0x20) >> 5),
-            static_cast<der::der_tag>(c & 0x1f),
+            static_cast<der::Class>((c & 0xc0) >> 6),
+            static_cast<der::PC>((c & 0x20) >> 5),
+            static_cast<der::Tag>(c & 0x1f),
     };
 }
 
@@ -105,7 +101,7 @@ static std::optional<std::vector<unsigned char>> read_value(std::istream &is, co
     return v;
 }
 
-static std::optional<Json::Value> read_sub_value(std::istream &is, der::der_pc pc, der::der_tag tag, const size_t len) {
+static std::optional<Json::Value> read_sub_value(std::istream &is, der::PC pc, der::Tag tag, const size_t len) {
     if (pc != der::PRIMITIVE) {
         return read_constructed(is, len);
     }
@@ -117,7 +113,7 @@ static std::optional<Json::Value> read_sub_value(std::istream &is, der::der_pc p
     return type_change(tag, *vec);
 }
 
-static Json::Value type_change(const der::der_tag tag, std::vector<unsigned char> v) {
+static Json::Value type_change(const der::Tag tag, std::vector<unsigned char> v) {
     switch (tag) {
     case der::EOC:
     case der::BOOLEAN:

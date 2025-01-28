@@ -26,23 +26,23 @@
 template<bool SV = true>
 class TLS {
 protected:
-    GCM<aes128> aes_[2]; ///< GCM mode AES-128 cipher
+    GCM<AES128> aes_[2]; ///< GCM mode AES-128 cipher
     mpz_class enc_seq_num_ = 0, dec_seq_num_ = 0; ///< Sequence number for encryption and decryption
 
     /** secp256r1 elliptic curve parameters */
-    ec_field secp256r1_{
+    ECField secp256r1_{
             0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC_mpz,
             0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B_mpz,
             0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF_mpz
     };
     /** Generator point for the secp256r1 curve */
-    ec_point G_{
+    ECPoint G_{
             0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296_mpz,
             0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5_mpz, secp256r1_
     };
 
     mpz_class prv_key_ = random_prime(31); ///< Private key for the curve
-    ec_point P_{prv_key_ * G_}; ///< Public key for the curve
+    ECPoint P_{prv_key_ * G_}; ///< Public key for the curve
 
     std::array<unsigned char, 32> session_id_, server_random_, client_random_;
 
@@ -55,7 +55,7 @@ protected:
 
     std::string accumulated_handshakes_; ///< Accumulated handshake messages
     static std::string certificate_; ///< Server certificate, read from file
-    static rsa_class rsa_; ///< Initialized with public key of the server certificate
+    static RSA rsa_; ///< Initialized with public key of the server certificate
 
 public:
     /**

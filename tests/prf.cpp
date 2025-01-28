@@ -7,7 +7,7 @@
 #include "tls/sha/sha1.h"
 
 TEST_CASE("PRF test") {
-    prf<sha1> prf;
+    PRF<SHA1> prf;
     unsigned char seed[100], secret[100];
     std::vector<std::vector<unsigned char>> vv;
     mpz_class z1{"0x3a64b675191395ba19842ad7d14c2d798fe9e2dab6b9ebcdfab50ec68a862691effbff693bc68643a6463c71b322c9d7cb3"

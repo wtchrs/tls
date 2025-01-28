@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/9/2024.
-//
-
 #include "tls/mpz.h"
 #include <catch2/catch_test_macros.hpp>
 
