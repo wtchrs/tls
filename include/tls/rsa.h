@@ -34,6 +34,8 @@ public:
      */
     RSA(const mpz_class &e, const mpz_class &d, const mpz_class &K);
 
+    RSA(const RSA &rsa);
+
     /**
      * @brief Signs a message by decoding it with the private key.
      * @param m The message to be signed.

@@ -12,11 +12,15 @@ RSA::RSA(const int key_size) {
     mpz_invert(d_.get_mpz_t(), e_.get_mpz_t(), phi_.get_mpz_t()); // d = e^-1 mod phi
 }
 
-RSA::RSA(const mpz_class &e, const mpz_class &d, const mpz_class &K) {
-    this->e_ = e;
-    this->d_ = d;
-    this->K_ = K;
-}
+RSA::RSA(const mpz_class &e, const mpz_class &d, const mpz_class &K)
+    : K_{K}
+    , e_{e}
+    , d_{d} {}
+
+RSA::RSA(const RSA &rsa)
+    : K_{rsa.K_}
+    , e_{rsa.e_}
+    , d_{rsa.d_} {}
 
 mpz_class RSA::sign(const mpz_class &m) const {
     return decode(m);

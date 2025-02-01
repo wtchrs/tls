@@ -45,6 +45,7 @@ file(GLOB_RECURSE TEST_SOURCES
         tests/prf.cpp
         tests/rsa.cpp
         tests/sha.cpp
+        tests/tls.cpp
 )
 
 add_library(custom_tls STATIC ${SOURCES})

@@ -1,5 +1,6 @@
 #include "tls/tls.h"
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -20,21 +21,15 @@
 #include "tls/rsa.h"
 #include "tls/sha/sha2.h"
 
-static mpz_class zK, ze, zd;
+constexpr size_t RANDOM_SIZE = 32; // Size of client random and server random
+constexpr size_t PUBKEY_SIZE = 69;
+constexpr size_t MESSAGE_TO_HASH_SIZE = RANDOM_SIZE * 2 + PUBKEY_SIZE;
+constexpr size_t RSA_SIG_SIZE = 256;
 
-static std::string init_certificate() {
-    std::ifstream prv_pem{"cert/example/key.pem"};
-    std::ifstream cert_pem{"cert/example/cert.pem"};
-    auto opt_keys = get_keys(prv_pem);
-    if (!opt_keys) {
-        throw "Failed to parse the private key PEM file.";
-    }
-    auto [K, e, d] = *opt_keys;
-    zK = K;
-    ze = e;
-    zd = d;
-    std::vector<unsigned char> r = {tls_type::HANDSHAKE, 3, 3, 0, 0, tls_handshake_type::CERTIFICATE, 0, 0, 0, 0, 0, 0};
-    for (std::string s; (s = get_certificate_core(cert_pem)) != "";) {
+std::string init_certificate() {
+    std::ifstream cert_pem{"../../cert/example/cert.pem"};
+    std::vector<unsigned char> r = {HANDSHAKE, 3, 3, 0, 0, CERTIFICATE, 0, 0, 0, 0, 0, 0};
+    for (std::string s; !(s = get_certificate_core(cert_pem)).empty();) {
         auto v = base64_decode(s);
         r.resize(r.size() + 3);
         mpz2bnd(static_cast<int>(v.size()), r.end() - 3, r.end());
@@ -46,18 +41,31 @@ static std::string init_certificate() {
     return {r.cbegin(), r.cend()};
 }
 
+RSA init_rsa() {
+    std::ifstream prv_pem{"../../cert/example/key.pem"};
+    if (!prv_pem.is_open()) {
+        throw "Failed to open the private key PEM file.";
+    }
+    auto opt_keys = get_keys(prv_pem);
+    if (!opt_keys) {
+        throw "Failed to parse the private key PEM file.";
+    }
+    auto [K, e, d] = *opt_keys;
+    return {e, d, K};
+}
+
 template<bool SV>
 std::string TLS<SV>::certificate_ = init_certificate();
 
 template<bool SV>
-RSA TLS<SV>::rsa_{ze, zd, zK};
+RSA TLS<SV>::rsa_ = init_rsa();
 
 // Pack structs to 1 byte alignment to avoid padding
 #pragma pack(push, 1)
 
 struct TLS_header {
     /** 0x15: Alert, 0x16: Handshake, 0x17: Application data */
-    uint8_t content_type = tls_type::HANDSHAKE;
+    uint8_t content_type = HANDSHAKE;
     /** 0x0303 for TLS 1.2 */
     uint8_t version[2] = {0x03, 0x03};
     uint8_t length[2] = {0, 4};
@@ -67,7 +75,8 @@ struct TLS_header {
         length[1] = k % 0x100;
     }
 
-    size_t get_length() {
+    [[nodiscard]]
+    size_t get_length() const {
         return length[0] * 0x100 + length[1];
     }
 };
@@ -82,7 +91,8 @@ struct handshake_header {
         length[2] = k % 0x100;
     }
 
-    size_t get_length() {
+    [[nodiscard]]
+    size_t get_length() const {
         return length[0] * 0x10000 + length[1] * 0x100 + length[2];
     }
 };
@@ -98,7 +108,7 @@ struct hello_common {
 
 struct client_hello_message {
     TLS_header tls;
-    handshake_header handshake{tls_handshake_type::CLIENT_HELLO};
+    handshake_header handshake{CLIENT_HELLO};
     hello_common hello;
 
     /* length of cipher_suite. It should be even number. */
@@ -111,7 +121,8 @@ struct client_hello_message {
     uint8_t compression_length = 1;
     uint8_t compression_method = 0; // None
 
-    int get_cipher_suite_length() {
+    [[nodiscard]]
+    int get_cipher_suite_length() const {
         return cipher_suite_length[0] * 0x100 + cipher_suite_length[1];
     }
 };
@@ -119,7 +130,7 @@ struct client_hello_message {
 struct server_hello_message {
     TLS_header tls{.length = {0, sizeof(server_hello_message) - sizeof(TLS_header)}};
     handshake_header handshake{
-            .handshake_type = tls_handshake_type::SERVER_HELLO,
+            .handshake_type = SERVER_HELLO,
             .length = {0, 0, sizeof(server_hello_message) - sizeof(TLS_header) - sizeof(handshake_header)},
     };
     hello_common hello;
@@ -178,19 +189,19 @@ struct server_key_exchange_message {
 
 struct server_hello_done_message {
     TLS_header tls;
-    handshake_header handshake{.handshake_type = tls_handshake_type::SERVER_DONE};
+    handshake_header handshake{.handshake_type = SERVER_DONE};
 };
 
 struct client_key_exchange_message {
     TLS_header tls;
-    handshake_header handshake{.handshake_type = tls_handshake_type::CLIENT_KEY_EXCHANGE};
+    handshake_header handshake{.handshake_type = CLIENT_KEY_EXCHANGE};
     uint8_t len = 65;
     uint8_t uncompressed = 4;
     uint8_t x[32], y[32];
 };
 
 struct change_cipher_spec_message {
-    TLS_header tls{.content_type = tls_type::CHANGE_CIPHER_SPEC};
+    TLS_header tls{.content_type = CHANGE_CIPHER_SPEC};
     uint8_t spec = 1;
 };
 
@@ -215,7 +226,7 @@ struct auth_tag_data {
 
 struct alert_message {
     /** tls.content_type: 0x15, tls.length: 2 */
-    TLS_header tls{.content_type = tls_type::ALERT, .length = {0, 2}};
+    TLS_header tls{.content_type = ALERT, .length = {0, 2}};
     uint8_t alert_level;
     uint8_t alert_desc;
 };
@@ -224,35 +235,41 @@ struct alert_message {
 
 template<typename T>
 static std::string struct2str(const T &t) {
-    return std::string{reinterpret_cast<char *>(&t), sizeof(t)};
+    return std::string{reinterpret_cast<const char *>(&t), sizeof(t)};
+}
+
+template<bool SV>
+std::pair<int, int> TLS<SV>::get_content_type(const std::string &s) {
+    auto p = reinterpret_cast<const uint8_t *>(s.data());
+    return {p[0], p[5]};
 }
 
 template<bool SV>
 std::optional<std::string> TLS<SV>::decode(std::string &&s) {
-    auto p = (received_message *) s.data();
+    const auto p = reinterpret_cast<received_message *>(s.data());
     auth_tag_data tag_data;
-    if (int type = get_content_type(s).first; type != tls_type::HANDSHAKE && type != tls_type::APPLICATION_DATA) {
+    if (const int type = get_content_type(s).first; type != HANDSHAKE && type != APPLICATION_DATA) {
         return std::nullopt;
     }
     // Increase sequence number after filling tag_data.seq.
     mpz2bnd(dec_seq_num_++, tag_data.seq, tag_data.seq + 8);
     tag_data.tls = p->tls;
-    int msg_len = p->tls.get_length() - sizeof(received_message::iv) - 16; // except iv and tag length
+    const auto msg_len = p->tls.get_length() - sizeof(received_message::iv) - 16; // except iv and tag length
     tag_data.tls.set_length(msg_len);
-    uint8_t *aad = reinterpret_cast<uint8_t *>(&tag_data);
+    const auto *aad = reinterpret_cast<uint8_t *>(&tag_data);
     aes_[!SV].set_aad(aad, sizeof(tag_data));
     aes_[!SV].set_iv(p->iv, 4, 8);
+
     auto auth = aes_[!SV].decrypt(p->m, msg_len);
-    if (std::equal(auth.begin(), auth.end(), p->m + msg_len)) {
-        return std::string{p->m, p->m + msg_len};
-    } else {
+    if (!std::equal(auth.begin(), auth.end(), p->m + msg_len)) {
         // Failed to check authentication tag
         return std::nullopt;
     }
+    return std::string{p->m, p->m + msg_len};
 }
 
 template<bool SV>
-std::string TLS<SV>::encode(std::string &&s, int type) {
+std::string TLS<SV>::encode(std::string &&s, const int type) {
     // GCM-based encoding
     send_message_header header;
     auth_tag_data tag_data;
@@ -260,23 +277,24 @@ std::string TLS<SV>::encode(std::string &&s, int type) {
 
     // Increase sequence number after filling tag_data.seq.
     mpz2bnd(enc_seq_num_++, tag_data.seq, tag_data.seq + 8);
-    constexpr size_t chunk_size = (1 << 14) - 64; // Maximum length for one packet.
-    size_t len = std::min(s.size(), chunk_size);
+    constexpr size_t CHUNK_SIZE = (1 << 14) - 64; // Maximum length for one packet.
+    const size_t len = std::min(s.size(), CHUNK_SIZE);
     tag_data.tls.set_length(len);
     std::string frag = s.substr(0, len);
 
     mpz2bnd(random_prime(8), header.iv, header.iv + 8);
     aes_[SV].set_iv(header.iv, 4, 8);
-    uint8_t *aad = reinterpret_cast<uint8_t *>(&header);
-    aes_[SV].set_aad(aad, sizeof(header));
-    auto tag = aes_[SV].encrypt(reinterpret_cast<unsigned char *>(&frag[0]), frag.size());
+    const auto *aad = reinterpret_cast<uint8_t *>(&tag_data);
+    aes_[SV].set_aad(aad, sizeof(tag_data));
+
+    const auto tag = aes_[SV].encrypt(reinterpret_cast<unsigned char *>(frag.data()), frag.size());
     frag += std::string{tag.cbegin(), tag.cend()}; // Attach auth tag
     header.tls.set_length(sizeof(header.iv) + frag.size());
     std::string r = struct2str(header) + frag;
 
-    if (s.size() > chunk_size) {
+    if (s.size() > CHUNK_SIZE) {
         // Encode recursively if the message is long.
-        r += encode(s.substr(chunk_size));
+        r += encode(s.substr(CHUNK_SIZE));
     }
     return r;
 }
@@ -295,14 +313,14 @@ std::string TLS<SV>::client_hello(std::string &&s) {
         return accumulate(struct2str(msg));
     } else {
         // server
-        if (get_content_type(s) != std::pair{tls_type::HANDSHAKE, tls_handshake_type::CLIENT_HELLO}) {
+        if (get_content_type(s) != std::pair{HANDSHAKE, CLIENT_HELLO}) {
             return alert(2, 10);
         }
         accumulate(s);
-        client_hello_message *received = reinterpret_cast<client_hello_message *>(s.data());
+        auto *received = reinterpret_cast<client_hello_message *>(s.data());
         std::copy_n(received->hello.random, 32, client_random_.data());
-        int len = received->get_cipher_suite_length();
-        unsigned char *p = received->cipher_suite;
+        const int len = received->get_cipher_suite_length();
+        const unsigned char *p = received->cipher_suite;
         // Return null string if TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f) exists in cipher suite list.
         for (int i = 0; i < len; i += 2) {
             if (*(p + i) == 0xc0 && *(p + i + 1) == 0x2f) {
@@ -326,11 +344,11 @@ std::string TLS<SV>::server_hello(std::string &&s) {
         return accumulate(struct2str(msg));
     } else {
         // client
-        if (get_content_type(s) != std::pair{tls_type::HANDSHAKE, tls_handshake_type::SERVER_HELLO}) {
+        if (get_content_type(s) != std::pair{HANDSHAKE, SERVER_HELLO}) {
             return alert(2, 10);
         }
         accumulate(s);
-        server_hello_message *msg = reinterpret_cast<server_hello_message *>(s.data());
+        const auto msg = reinterpret_cast<server_hello_message *>(s.data());
         std::copy_n(msg->hello.random, 32, server_random_.begin());
         std::copy_n(msg->hello.session_id, 32, session_id_.begin());
         // Return null string if cipher suite is TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f).
@@ -349,20 +367,20 @@ std::string TLS<SV>::server_certificate(std::string &&s) {
         return accumulate(certificate_);
     } else {
         // client
-        if (get_content_type(s) != std::pair{tls_type::HANDSHAKE, tls_handshake_type::CERTIFICATE}) {
+        if (get_content_type(s) != std::pair{HANDSHAKE, CERTIFICATE}) {
             return alert(2, 10);
         }
         accumulate(s);
-        certificate_message *msg = reinterpret_cast<certificate_message *>(s.data());
+        const auto msg = reinterpret_cast<certificate_message *>(s.data());
         std::stringstream ss;
-        uint8_t *p = msg->certificate_length[1]; // length of only the first certificate
+        const uint8_t *p = msg->certificate_length[1]; // length of only the first certificate
         // TODO: Change this method to check all certificate chains.
         for (int i = 0, j = *p * 0x10000 + *(p + 1) * 0x100 + *(p + 2); i < j; i++) {
             // Write bytes of the first certificate to ss
             ss << std::noskipws << msg->certificate[i];
         }
         // Read the first certificate and extract public key parameters.
-        auto opt_pubkey = der2json(ss).transform([](auto json_value) { return get_pubkeys(json_value); });
+        auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
         if (!opt_pubkey) {
             std::cerr << "Failed to parse the received certificate.";
             return alert(2, 44);
@@ -375,23 +393,19 @@ std::string TLS<SV>::server_certificate(std::string &&s) {
 }
 
 template<bool SV>
-void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) {
+void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) const {
     // Prepare the data to be signed.
-    constexpr size_t RANDOM_SIZE = 32;
-    constexpr size_t PUBKEY_SIZE = 69;
-    constexpr size_t MESSAGE_TO_HASH_SIZE = RANDOM_SIZE * 2 + PUBKEY_SIZE;
     unsigned char message_to_hash[MESSAGE_TO_HASH_SIZE]; // server random + client random + public key
     std::copy(server_random_.cbegin(), server_random_.cend(), message_to_hash);
     std::copy(client_random_.cbegin(), client_random_.cend(), message_to_hash + RANDOM_SIZE);
     std::copy_n(pub_key, 69, message_to_hash + RANDOM_SIZE * 2);
     SHA256 sha;
-    auto hash = sha.hash(message_to_hash, message_to_hash + MESSAGE_TO_HASH_SIZE); // Result size is 32 bytes.
+    const auto hash = sha.hash(message_to_hash, message_to_hash + MESSAGE_TO_HASH_SIZE); // Result size is 32 bytes.
 
     // Prepare PKCS#1 v1.5 padding structure.
     // See more: https://www.rfc-editor.org/rfc/rfc8017#section-9.2
-    constexpr size_t RSA_SIZE = 256;
-    unsigned char padded[RSA_SIZE];
-    unsigned char *ptr = padded + RSA_SIZE; // Start from the end of padded
+    unsigned char padded[RSA_SIG_SIZE];
+    unsigned char *ptr = padded + RSA_SIG_SIZE; // Start from the end of padded
     // Add hash value.
     ptr -= hash.size();
     std::copy(hash.cbegin(), hash.cend(), ptr);
@@ -409,27 +423,27 @@ void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) {
     padded[1] = 0x01;
 
     // Sign with RSA.
-    auto z = rsa_.sign(bnd2mpz(padded, padded + 256));
-    mpz2bnd(z, sign, sign + 256);
+    const auto z = rsa_.sign(bnd2mpz(padded, padded + 256));
+    mpz2bnd(z, sign, sign + RSA_SIG_SIZE);
 }
 
 template<bool SV>
-void TLS<SV>::derive_keys(mpz_class premaster_secret) {
+void TLS<SV>::derive_keys(const mpz_class &premaster_secret) {
     unsigned char pre[32], rand[64];
     mpz2bnd(premaster_secret, pre, pre + 32);
-    PRF<SHA256> p;
-    p.secret(pre, pre + 32);
+    PRF<SHA256> prf;
+    prf.secret(pre, pre + 32);
     std::copy(client_random_.cbegin(), client_random_.cend(), rand);
     std::copy(server_random_.cbegin(), server_random_.cend(), rand + 32);
-    p.seed(rand, rand + 64);
-    p.label("master secret");
-    master_secret_ = p.get_n_bytes(48);
-    p.secret(master_secret_.begin(), master_secret_.end());
+    prf.seed(rand, rand + 64);
+    prf.label("master secret");
+    master_secret_ = prf.get_n_bytes(48);
+    prf.secret(master_secret_.begin(), master_secret_.end());
     std::copy(server_random_.cbegin(), server_random_.cend(), rand);
     std::copy(client_random_.cbegin(), client_random_.cend(), rand + 32);
-    p.seed(rand, rand + 64);
-    p.label("key expansion");
-    auto v = p.get_n_bytes(40);
+    prf.seed(rand, rand + 64);
+    prf.label("key expansion");
+    const auto v = prf.get_n_bytes(40);
     aes_[0].set_key(&v[0]);
     aes_[1].set_key(&v[16]);
     aes_[0].set_iv(&v[32], 0, 4);
@@ -443,39 +457,41 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
         server_key_exchange_message msg;
         msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
         msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-        msg.handshake.handshake_type = tls_handshake_type::SERVER_KEY_EXCHANGE;
+        msg.handshake.handshake_type = SERVER_KEY_EXCHANGE;
         mpz2bnd(P_.x_, msg.x, msg.x + 32);
         mpz2bnd(P_.y_, msg.y, msg.y + 32);
         generate_signature(&msg.named_curve, msg.sign);
         return accumulate(struct2str(msg));
     } else {
         // client
-        if (get_content_type(s) != std::pair{tls_type::HANDSHAKE, tls_handshake_type::SERVER_KEY_EXCHANGE}) {
+        if (get_content_type(s) != std::pair{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
             return alert(2, 10);
         }
         accumulate(s);
-        auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
+        const auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
         // Extract server's ephemeral public key from received message.
-        ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
+        const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
         // Compute shared key.
         derive_keys((prv_key_ * Y).x_);
 
         // Check signature.
-        auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + 256));
-        unsigned char check_sig[256];
-        mpz2bnd(z, check_sig, check_sig + 256);
-        unsigned char check_hash[133];
+        auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + RSA_SIG_SIZE));
+        unsigned char check_sig[RSA_SIG_SIZE];
+        mpz2bnd(z, check_sig, check_sig + RSA_SIG_SIZE);
+        unsigned char check_hash[MESSAGE_TO_HASH_SIZE];
         std::copy(client_random_.cbegin(), client_random_.cend(), check_hash);
-        std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + 32);
-        std::copy_n(&p->named_curve, 69, check_hash + 64);
-        SHA256 sha;
-        auto hash = sha.hash(check_hash, check_hash + 133);
+        std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + RANDOM_SIZE);
+        std::copy_n(&p->named_curve, PUBKEY_SIZE, check_hash + RANDOM_SIZE * 2);
 
-        if (std::equal(check_sig + 224, check_sig + 256, hash.begin())) {
+        SHA256 sha;
+        auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
+        if (std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
+            std::cerr << "server_key_exchange:client: Check signature - success" << std::endl;
             return "";
-        } else {
-            return alert(2, 51); // decrypt error
         }
+
+        std::cerr << "server_key_exchange:client: Check signature - fail" << std::endl;
+        return alert(2, 51); // decrypt error
     }
 }
 
@@ -483,11 +499,11 @@ template<bool SV>
 std::string TLS<SV>::server_hello_done(std::string &&s) {
     if constexpr (SV) {
         // server
-        server_hello_done_message msg;
+        constexpr server_hello_done_message msg;
         return accumulate(struct2str(msg));
     } else {
         // client
-        if (get_content_type(s) != std::pair{tls_type::HANDSHAKE, tls_handshake_type::SERVER_DONE}) {
+        if (get_content_type(s) != std::pair{HANDSHAKE, SERVER_DONE}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -500,12 +516,12 @@ std::string TLS<SV>::client_key_exchange(std::string &&s) {
     // After this step, messages between server and client are encrypted.
     if constexpr (SV) {
         // server
-        if (get_content_type(s) == std::pair{tls_type::HANDSHAKE, tls_handshake_type::CLIENT_KEY_EXCHANGE}) {
+        if (get_content_type(s) != std::pair{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
             return alert(2, 10);
         }
         accumulate(s);
-        auto p = (client_key_exchange_message *) s.data();
-        ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
+        auto p = reinterpret_cast<client_key_exchange_message *>(s.data());
+        const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
         // Compute shared key.
         derive_keys((prv_key_ * Y).x_);
         return "";
@@ -523,18 +539,17 @@ std::string TLS<SV>::client_key_exchange(std::string &&s) {
 
 template<bool SV>
 std::string TLS<SV>::change_cipher_spec(std::string &&s) {
-    if (s == "") {
+    if (s.empty()) {
         // send CHANGE_CIPHER_SPEC message
         change_cipher_spec_message msg;
         msg.tls.set_length(1);
         return struct2str(msg);
-    } else {
-        // receive CHANGE_CIPHER_SPEC message
-        if (get_content_type(s).first != tls_type::CHANGE_CIPHER_SPEC) {
-            return alert(2, 10);
-        }
-        return "";
     }
+    // receive CHANGE_CIPHER_SPEC message
+    if (get_content_type(s).first != CHANGE_CIPHER_SPEC) {
+        return alert(2, 10);
+    }
+    return "";
 }
 
 template<bool SV>
@@ -542,40 +557,43 @@ std::string TLS<SV>::finished(std::string &&s) {
     PRF<SHA256> prf;
     SHA256 sha;
     prf.secret(master_secret_.cbegin(), master_secret_.cend());
-    auto hash = sha.hash(accumulated_handshakes_.cbegin(), accumulated_handshakes_.cend());
+    const auto hash = sha.hash(accumulated_handshakes_.cbegin(), accumulated_handshakes_.cend());
     prf.seed(hash.cbegin(), hash.cend());
     const char *label[2] = {"client finished", "server finished"};
-    prf.label(label[s == "" ? SV : !SV]);
-    auto v = prf.get_n_bytes(12);
+    prf.label(label[s.empty() ? SV : !SV]);
+    const auto v = prf.get_n_bytes(12);
 
     handshake_header handshake;
-    handshake.handshake_type = tls_handshake_type::FINISHED;
+    handshake.handshake_type = FINISHED;
     handshake.set_length(12);
 
     std::string msg = struct2str(handshake) + std::string{v.cbegin(), v.cend()};
     accumulated_handshakes_ += msg;
 
-    if (s == "") {
+    if (s.empty()) {
         // Send FINISHED message.
-        return encode(std::move(msg), tls_type::HANDSHAKE);
-    } else if (decode(std::move(s)) != msg) {
+        return encode(std::move(msg), HANDSHAKE);
+    }
+
+    const auto opt_result = decode(std::move(s));
+    if (!opt_result || *opt_result != msg) {
         // Failed to parse received FINISHED message.
         return alert(2, 51);
-    } else {
-        // Successed to parse received FINISHED message.
-        return "";
     }
+
+    // Successes to parse received FINISHED message.
+    return "";
 }
 
 template<bool SV>
-std::string TLS<SV>::alert(uint8_t level, uint8_t desc) {
-    alert_message h{.alert_level = level, .alert_desc = desc};
+std::string TLS<SV>::alert(const uint8_t level, const uint8_t desc) {
+    const alert_message h{.alert_level = level, .alert_desc = desc};
     return struct2str(h);
 }
 
 template<bool SV>
 int TLS<SV>::alert(std::string &&s) {
-    alert_message *p = reinterpret_cast<alert_message *>(s.data());
+    const auto *p = reinterpret_cast<alert_message *>(s.data());
     int level, desc;
 
     if (p->tls.get_length() == 2) {
@@ -584,7 +602,7 @@ int TLS<SV>::alert(std::string &&s) {
         desc = p->alert_desc;
     } else {
         // For encrypted alert message
-        s = decode(s);
+        s = *decode(std::move(s));
         level = static_cast<uint8_t>(s[0]);
         desc = static_cast<uint8_t>(s[1]);
     }
@@ -616,6 +634,7 @@ int TLS<SV>::alert(std::string &&s) {
     case 90: s = "user_canceled(90)"; break;
     case 100: s = "no_renegotiation(100)"; break;
     case 110: s = "unsupported_extension(110)"; break;
+    default: s = "alert"; break;
     }
 
     if (level == 1 || level == 2) {
@@ -630,3 +649,7 @@ std::string TLS<SV>::accumulate(const std::string &s) {
     accumulated_handshakes_ += s.substr(sizeof(TLS_header));
     return s;
 }
+
+// Explicit template instantiation
+template class TLS<true>;
+template class TLS<false>;

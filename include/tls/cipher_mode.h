@@ -30,7 +30,7 @@ template<CIPHER Cipher>
 class CipherMode {
 protected:
     Cipher cipher_; // The cipher algorithm instance
-    unsigned char iv_[16]; // The initialization vector
+    unsigned char iv_[16] = {}; // The initialization vector
 
 public:
     /**
@@ -227,7 +227,7 @@ template<CIPHER Cipher>
 std::array<unsigned char, 16> GCM<Cipher>::decrypt(unsigned char *p, size_t len) {
     const auto auth = generate_auth(p, len);
     for (size_t i = 0; i < len; i += 16)
-        xor_with_enc_iv_and_counter(p + 1, std::min(static_cast<size_t>(16), len - i), i / 16 + 2);
+        xor_with_enc_iv_and_counter(p + i, std::min(static_cast<size_t>(16), len - i), i / 16 + 2);
     return auth;
 }
 

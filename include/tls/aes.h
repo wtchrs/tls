@@ -133,7 +133,7 @@ private:
     static unsigned char doub(unsigned char c);
 
 #ifdef TESTING
-    friend class aes128_test; // For testing purposes
+    friend class AES128Test; // For testing purposes
 #endif
 };
 
