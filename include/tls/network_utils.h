@@ -6,14 +6,7 @@
 #include <cstdint>
 
 constexpr bool is_little_endian() {
-#if __cplusplus >= 202002L
-    // C++20
     return std::endian::native == std::endian::little;
-#else
-    // Pre-C++20
-    constexpr uint32_t i = 1;
-    return *reinterpret_cast<const uint8_t *>(&i) == 1;
-#endif
 }
 
 /**

@@ -6,7 +6,6 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
-#include <cstring>
 #include <vector>
 #include "mpz.h"
 
@@ -120,7 +119,7 @@ template<CIPHER Cipher>
 class GCM : public CipherMode<Cipher> {
 protected:
     std::vector<unsigned char> aad_; // Additional authenticated data
-    unsigned char len_ac_[16]; // Length of AAD and ciphertext in big-endian format
+    unsigned char len_ac_[16] = {}; // Length of AAD and ciphertext in big-endian format
 
 public:
     /**

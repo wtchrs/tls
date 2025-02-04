@@ -3,11 +3,12 @@ project(custom_tls)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (MSVC)
-    add_compile_options(/W4)
+    set(CMAKE_CXX_FLAGS "/W4")
 else()
-    add_compile_options(-Wall -Wextra)
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 endif ()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -19,6 +20,9 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(gmpxx REQUIRED IMPORTED_TARGET gmpxx)
 pkg_check_modules(nettle REQUIRED IMPORTED_TARGET nettle)
 pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
+
+# Add custom flags
+add_compile_definitions(PRINT_LOG)
 
 file(GLOB_RECURSE SOURCES
         src/aes.cpp

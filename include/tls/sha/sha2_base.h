@@ -89,8 +89,8 @@ public:
 protected:
     bool big_endian_ = false; // Indicates if the system is big-endian.
 
-    WORD H_[8]; // Hash values
-    WORD W_[W_SIZE]; // Message schedule
+    WORD H_[8] = {}; // Hash values
+    WORD W_[W_SIZE] = {}; // Message schedule
 
 public:
     SHA2Base();

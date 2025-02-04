@@ -70,7 +70,7 @@ struct TLS_header {
     uint8_t version[2] = {0x03, 0x03};
     uint8_t length[2] = {0, 4};
 
-    void set_length(size_t k) {
+    void set_length(const size_t k) {
         length[0] = k / 0x100;
         length[1] = k % 0x100;
     }
@@ -82,10 +82,10 @@ struct TLS_header {
 };
 
 struct handshake_header {
-    uint8_t handshake_type;
+    uint8_t handshake_type = HELLO_REQUEST;
     uint8_t length[3] = {0, 0, 0};
 
-    void set_length(size_t k) {
+    void set_length(const size_t k) {
         length[0] = k / 0x10000;
         length[1] = k % 0x10000 / 0x100;
         length[2] = k % 0x100;
@@ -101,9 +101,9 @@ struct hello_common {
     /** 0x0303 for TLS 1.2 */
     uint8_t version[2] = {0x03, 0x03};
     /** Server random and client random */
-    uint8_t random[32];
+    uint8_t random[32] = {};
     uint8_t session_id_length = 32;
-    uint8_t session_id[32];
+    uint8_t session_id[32] = {};
 };
 
 struct client_hello_message {
@@ -150,7 +150,7 @@ struct certificate_message {
     handshake_header handshake;
 
     /** Total length of all certificates and length of the first certificate */
-    uint8_t certificate_length[2][3];
+    uint8_t certificate_length[2][3] = {};
     unsigned char certificate[];
 };
 
@@ -162,7 +162,7 @@ struct server_key_exchange_message {
     uint8_t secp256r[2] = {0, 0x17};
     uint8_t key_length = 65;
     uint8_t uncompressed = 4;
-    uint8_t x[32], y[32];
+    uint8_t x[32] = {}, y[32] = {};
 
     /**
      * signature hash  value
@@ -184,7 +184,7 @@ struct server_key_exchange_message {
      */
     uint8_t signature_sign = 1;
     uint8_t signature_length[2] = {1, 0}; // length: 256 (0x100)
-    uint8_t sign[256];
+    uint8_t sign[256] = {};
 };
 
 struct server_hello_done_message {
@@ -197,7 +197,7 @@ struct client_key_exchange_message {
     handshake_header handshake{.handshake_type = CLIENT_KEY_EXCHANGE};
     uint8_t len = 65;
     uint8_t uncompressed = 4;
-    uint8_t x[32], y[32];
+    uint8_t x[32] = {}, y[32] = {};
 };
 
 struct change_cipher_spec_message {
@@ -208,19 +208,19 @@ struct change_cipher_spec_message {
 // For parsing received message.
 struct received_message {
     TLS_header tls;
-    uint8_t iv[8];
+    uint8_t iv[8] = {};
     unsigned char m[];
 };
 
 // Header for sending message.
 struct send_message_header {
     TLS_header tls;
-    uint8_t iv[8];
+    uint8_t iv[8] = {};
 };
 
 // For authentication tag.
 struct auth_tag_data {
-    uint8_t seq[8];
+    uint8_t seq[8] = {};
     TLS_header tls;
 };
 
@@ -229,6 +229,11 @@ struct alert_message {
     TLS_header tls{.content_type = ALERT, .length = {0, 2}};
     uint8_t alert_level;
     uint8_t alert_desc;
+
+    alert_message(const uint8_t alert_level, const uint8_t alert_desc) {
+        this->alert_level = alert_level;
+        this->alert_desc = alert_desc;
+    }
 };
 
 #pragma pack(pop)
@@ -313,7 +318,7 @@ std::string TLS<SV>::client_hello(std::string &&s) {
         return accumulate(struct2str(msg));
     } else {
         // server
-        if (get_content_type(s) != std::pair{HANDSHAKE, CLIENT_HELLO}) {
+        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -344,7 +349,7 @@ std::string TLS<SV>::server_hello(std::string &&s) {
         return accumulate(struct2str(msg));
     } else {
         // client
-        if (get_content_type(s) != std::pair{HANDSHAKE, SERVER_HELLO}) {
+        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -367,7 +372,7 @@ std::string TLS<SV>::server_certificate(std::string &&s) {
         return accumulate(certificate_);
     } else {
         // client
-        if (get_content_type(s) != std::pair{HANDSHAKE, CERTIFICATE}) {
+        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CERTIFICATE}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -396,9 +401,9 @@ template<bool SV>
 void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) const {
     // Prepare the data to be signed.
     unsigned char message_to_hash[MESSAGE_TO_HASH_SIZE]; // server random + client random + public key
-    std::copy(server_random_.cbegin(), server_random_.cend(), message_to_hash);
-    std::copy(client_random_.cbegin(), client_random_.cend(), message_to_hash + RANDOM_SIZE);
-    std::copy_n(pub_key, 69, message_to_hash + RANDOM_SIZE * 2);
+    std::copy(client_random_.cbegin(), client_random_.cend(), message_to_hash);
+    std::copy(server_random_.cbegin(), server_random_.cend(), message_to_hash + RANDOM_SIZE);
+    std::copy_n(pub_key, PUBKEY_SIZE, message_to_hash + RANDOM_SIZE * 2);
     SHA256 sha;
     const auto hash = sha.hash(message_to_hash, message_to_hash + MESSAGE_TO_HASH_SIZE); // Result size is 32 bytes.
 
@@ -464,7 +469,7 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
         return accumulate(struct2str(msg));
     } else {
         // client
-        if (get_content_type(s) != std::pair{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
+        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -486,11 +491,15 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
         SHA256 sha;
         auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
         if (std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
+#ifdef PRINT_LOG
             std::cerr << "server_key_exchange:client: Check signature - success" << std::endl;
+#endif
             return "";
         }
 
+#ifdef PRINT_LOG
         std::cerr << "server_key_exchange:client: Check signature - fail" << std::endl;
+#endif
         return alert(2, 51); // decrypt error
     }
 }
@@ -503,7 +512,7 @@ std::string TLS<SV>::server_hello_done(std::string &&s) {
         return accumulate(struct2str(msg));
     } else {
         // client
-        if (get_content_type(s) != std::pair{HANDSHAKE, SERVER_DONE}) {
+        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -516,7 +525,7 @@ std::string TLS<SV>::client_key_exchange(std::string &&s) {
     // After this step, messages between server and client are encrypted.
     if constexpr (SV) {
         // server
-        if (get_content_type(s) != std::pair{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
+        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
             return alert(2, 10);
         }
         accumulate(s);
@@ -587,7 +596,7 @@ std::string TLS<SV>::finished(std::string &&s) {
 
 template<bool SV>
 std::string TLS<SV>::alert(const uint8_t level, const uint8_t desc) {
-    const alert_message h{.alert_level = level, .alert_desc = desc};
+    const alert_message h{level, desc};
     return struct2str(h);
 }
 
