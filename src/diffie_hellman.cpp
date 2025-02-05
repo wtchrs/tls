@@ -1,7 +1,3 @@
-//
-// Created by wtchr on 8/5/2024.
-//
-
 #include "tls/diffie_hellman.h"
 
 #include <cassert>
@@ -18,84 +14,84 @@ const auto p_value = mpz_class{
         "BC2EC22005C58EF1837D1683B2C6F34A26C1B2EFFA886B423861285C97FFFFFFFFFFFFFFFF"
 };
 
-diffie_hellman::diffie_hellman()
-    : p{p_value}
-    , g{2}
-    , x{random_prime(255)}
-    , y{powm(g, x, p)} {}
+DiffieHellman::DiffieHellman()
+    : p_{p_value}
+    , g_{2}
+    , x_{random_prime(255)}
+    , y_{powm(g_, x_, p_)} {}
 
-mpz_class diffie_hellman::set_peer_public_key(const mpz_class &pub_key) {
-    this->K = powm(pub_key, x, p);
-    return K;
+mpz_class DiffieHellman::set_peer_public_key(const mpz_class &pub_key) {
+    this->K_ = powm(pub_key, x_, p_);
+    return K_;
 }
 
 // ec_field
 
-ec_field::ec_field(const mpz_class &a, const mpz_class &b, const mpz_class &mod) {
-    this->a = a;
-    this->b = b;
-    this->mod = mod;
+ECField::ECField(const mpz_class &a, const mpz_class &b, const mpz_class &mod) {
+    this->a_ = a;
+    this->b_ = b;
+    this->mod_ = mod;
 }
 
-mpz_class ec_field::mod_inv(const mpz_class &z) const {
+mpz_class ECField::mod_inv(const mpz_class &z) const {
     mpz_class r;
-    mpz_invert(r.get_mpz_t(), z.get_mpz_t(), mod.get_mpz_t());
+    mpz_invert(r.get_mpz_t(), z.get_mpz_t(), mod_.get_mpz_t());
     return r;
 }
 
 // ec_point
 
-ec_point::ec_point(const mpz_class &x, const mpz_class &y, const ec_field &f)
-    : ec_field(f) {
+ECPoint::ECPoint(const mpz_class &x, const mpz_class &y, const ECField &f)
+    : ECField(f) {
     // Assert the point is an element of the curve.
-    if (y != mod)
-        assert((y * y - (x * x * x + a * x + b)) % mod == 0);
-    this->x = x;
-    this->y = y;
+    if (y != mod_)
+        assert((y * y - (x * x * x + a_ * x + b_)) % mod_ == 0);
+    this->x_ = x;
+    this->y_ = y;
 }
 
-bool ec_point::is_identity() const {
-    return y == mod;
+bool ECPoint::is_identity() const {
+    return y_ == mod_;
 }
 
-ec_point ec_point::operator+(const ec_point &r) const {
+ECPoint ECPoint::operator+(const ECPoint &r) const {
     // y == mod: O (identity or infinity)
-    if (r.y == mod)
+    if (r.y_ == mod_)
         return *this; // P + O = P
-    if (y == mod)
+    if (y_ == mod_)
         return r; // O + P = P
     mpz_class s; // slope
     if (r == *this) {
-        if (y == 0)
-            return {x, mod, *this}; // Return identity
-        s = (3 * x * x + a) * mod_inv(2 * y) % mod;
+        if (y_ == 0)
+            return {x_, mod_, *this}; // Return identity
+        s = (3 * x_ * x_ + a_) * mod_inv(2 * y_) % mod_;
     } else {
-        if (x == r.x)
-            return {x, mod, *this}; // Return identity
-        s = (r.y - y) * mod_inv(r.x - x) % mod;
+        if (x_ == r.x_)
+            return {x_, mod_, *this}; // Return identity
+        s = (r.y_ - y_) * mod_inv(r.x_ - x_) % mod_;
     }
-    mpz_class x3 = (s * s - x - r.x) % mod;
-    mpz_class y3 = (s * (x - x3) - y) % mod;
+    mpz_class x3 = (s * s - x_ - r.x_) % mod_;
+    mpz_class y3 = (s * (x_ - x3) - y_) % mod_;
     if (x3 < 0)
-        x3 += mod;
+        x3 += mod_;
     if (y3 < 0)
-        y3 += mod;
+        y3 += mod_;
     return {x3, y3, *this};
 }
 
-bool ec_point::operator==(const ec_point &r) const {
+bool ECPoint::operator==(const ECPoint &r) const {
     // Assert the points are on the same curve.
-    assert(a == r.a && b == r.b && mod == r.mod);
-    return x == r.x && y == r.y;
+    assert(a_ == r.a_ && b_ == r.b_ && mod_ == r.mod_);
+    return x_ == r.x_ && y_ == r.y_;
 }
 
-ec_point operator*(const mpz_class &l, const ec_point &p) {
+ECPoint operator*(const mpz_class &l, const ECPoint &p) {
     std::vector<bool> bits;
     for (mpz_class n = l; n > 0; n /= 2) {
         bits.push_back(n % 2 == 1);
     }
-    ec_point r = {0, p.mod, p};
-    ec_point x = p;
+    ECPoint r = {0, p.mod_, p};
+    ECPoint x = p;
     for (auto bit : bits) {
         if (bit)
             r = r + x;
@@ -104,7 +100,7 @@ ec_point operator*(const mpz_class &l, const ec_point &p) {
     return r;
 }
 
-std::ostream &operator<<(std::ostream &os, const ec_point &r) {
-    os << "(" << r.x << ", " << r.y << ")";
+std::ostream &operator<<(std::ostream &os, const ECPoint &r) {
+    os << "(" << r.x_ << ", " << r.y_ << ")";
     return os;
 }

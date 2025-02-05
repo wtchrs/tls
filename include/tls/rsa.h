@@ -1,9 +1,6 @@
-//
-// Created by wtchr on 8/7/2024.
-//
-
 #ifndef RSA_H
 #define RSA_H
+
 
 #include <gmpxx.h>
 
@@ -11,10 +8,14 @@
 /**
  * @brief A class that implements RSA encryption and decryption.
  */
-class rsa_class {
+class RSA {
 public:
-    mpz_class K, e;
+    mpz_class K_, e_;
 
+protected:
+    mpz_class p_, q_, d_, phi_;
+
+public:
     /**
      * @brief Constructs an RSA object with a specified key size.
      *
@@ -23,7 +24,7 @@ public:
      *
      * @param key_size The size of the RSA key in bits.
      */
-    explicit rsa_class(int key_size);
+    explicit RSA(int key_size);
 
     /**
      * @brief Constructs an RSA object with provided public and private keys.
@@ -31,7 +32,9 @@ public:
      * @param d The private exponent.
      * @param K The modulus.
      */
-    rsa_class(const mpz_class &e, const mpz_class &d, const mpz_class &K);
+    RSA(const mpz_class &e, const mpz_class &d, const mpz_class &K);
+
+    RSA(const RSA &rsa);
 
     /**
      * @brief Signs a message by decoding it with the private key.
@@ -56,9 +59,6 @@ public:
      */
     [[nodiscard]]
     mpz_class decode(const mpz_class &m) const;
-
-protected:
-    mpz_class p, q, d, phi;
 };
 
 

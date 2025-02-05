@@ -1,9 +1,6 @@
-//
-// Created by wtchr on 8/5/2024.
-//
-
 #ifndef MPZ_H
 #define MPZ_H
+
 
 #include <gmpxx.h>
 #include <iomanip>

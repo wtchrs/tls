@@ -1,9 +1,6 @@
-//
-// Created by wtchr on 8/20/2024.
-//
-
 #ifndef DER_H
 #define DER_H
+
 
 #include <istream>
 #include <json/json.h>
@@ -12,7 +9,7 @@
 
 namespace der {
 
-    enum der_tag {
+    enum Tag {
         EOC = 0,
         BOOLEAN = 1,
         INTEGER = 2,
@@ -44,14 +41,14 @@ namespace der {
         BMP_STRING = 30
     };
 
-    enum der_class { UNIVERSAL = 0, APPLICATION = 1, CONTEXT_SPECIFIC = 2, PRIVATE = 3 };
+    enum Class { UNIVERSAL = 0, APPLICATION = 1, CONTEXT_SPECIFIC = 2, PRIVATE = 3 };
 
-    enum der_pc { PRIMITIVE = 0, CONSTRUCTED = 1 };
+    enum PC { PRIMITIVE = 0, CONSTRUCTED = 1 };
 
-    struct der_type {
-        der_class cls;
-        der_pc pc;
-        der_tag tag;
+    struct Type {
+        Class cls;
+        PC pc;
+        Tag tag;
     };
 
 } // namespace der

@@ -1,11 +1,7 @@
-//
-// Created by wtchr on 8/5/2024.
-//
-
 #include "tls/mpz.h"
 
 #include <cassert>
-#include <iomanip>
+#include <cstddef>
 #include <random>
 #include <vector>
 
@@ -28,7 +24,7 @@ mpz_class random_prime(const unsigned b) {
     do {
         std::uniform_int_distribution di{0, 0xff};
         std::random_device rd;
-        for (int i = 0; i < b; ++i)
+        for (size_t i = 0; i < b; ++i)
             arr[i] = di(rd);
         z = nextprime(bnd2mpz(arr.begin(), arr.end()));
         std::fill(arr.begin(), arr.end(), 0xff);

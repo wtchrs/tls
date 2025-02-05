@@ -1,19 +1,12 @@
-//
-// Created by wtchr on 8/14/2024.
-//
-
 #ifndef NETWORK_UTILS_H
 #define NETWORK_UTILS_H
+
 
 #include <bit>
 #include <cstdint>
 
 constexpr bool is_little_endian() {
-    // C++20
     return std::endian::native == std::endian::little;
-    // Pre-C++20
-    // constexpr uint32_t i = 1;
-    // return *reinterpret_cast<const uint8_t *>(&i) == 1;
 }
 
 /**
@@ -42,14 +35,15 @@ constexpr uint64_t htonl(const uint64_t hostlong) {
     return hostlong;
 }
 
-// Alias for htonl
+/** Alias for htonl */
 constexpr uint32_t ntohl(const uint32_t netlong) {
     return htonl(netlong);
 }
 
-// Alias for htonl
+/** Alias for htonl */
 constexpr uint64_t ntohl(const uint64_t netlong) {
     return htonl(netlong);
 }
+
 
 #endif

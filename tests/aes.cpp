@@ -1,40 +1,14 @@
-//
-// Created by wtchr on 8/9/2024.
-//
-
 #include "tls/aes.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
-
-class aes128_test {
-public:
-    static void shift_row(unsigned char *msg) {
-        aes128::shift_row(msg);
-    }
-
-    static void inv_shift_row(unsigned char *msg) {
-        aes128::inv_shift_row(msg);
-    }
-
-    static void mix_column(unsigned char *msg) {
-        aes128::mix_column(msg);
-    }
-
-    static void inv_mix_column(unsigned char *msg) {
-        aes128::inv_mix_column(msg);
-    }
-
-    static const unsigned char *get_schedule(const aes128 &aes) {
-        return aes.schedule[0];
-    }
-};
+#include "aes_test.h"
 
 TEST_CASE("Inverse mix column matrix verify") {
     unsigned char inv[16] = {14, 9, 13, 11, 11, 14, 9, 13, 13, 11, 14, 9, 9, 13, 11, 14};
     unsigned char mix[16] = {2, 1, 1, 3, 3, 2, 1, 1, 1, 3, 2, 1, 1, 1, 3, 2};
     unsigned char o[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-    aes128_test::mix_column(inv);
-    aes128_test::inv_mix_column(mix);
+    AES128Test::mix_column(inv);
+    AES128Test::inv_mix_column(mix);
     REQUIRE(std::equal(inv, inv + 16, o));
     REQUIRE(std::equal(mix, mix + 16, o));
 }
@@ -47,14 +21,14 @@ TEST_CASE("Shift row and mix column") {
                                           0x09, 0x0e, 0x03, 0x08, 0x0d, 0x02, 0x07, 0x0c};
     unsigned char mix_column_result[16] = {0x03, 0x04, 0x09, 0x0a, 0x0f, 0x08, 0x15, 0x1e,
                                            0x0b, 0x0c, 0x01, 0x02, 0x17, 0x10, 0x2d, 0x36};
-    aes128_test::shift_row(data);
+    AES128Test::shift_row(data);
     REQUIRE(std::equal(data, data + 16, shift_row_result));
-    aes128_test::inv_shift_row(data);
+    AES128Test::inv_shift_row(data);
     REQUIRE(std::equal(data, data + 16, oneto16));
 
-    aes128_test::mix_column(data);
+    AES128Test::mix_column(data);
     REQUIRE(std::equal(data, data + 16, mix_column_result));
-    aes128_test::inv_mix_column(data);
+    AES128Test::inv_mix_column(data);
     REQUIRE(std::equal(data, data + 16, oneto16));
 }
 
@@ -72,13 +46,13 @@ unsigned char schedule[11 * 16] = {
 };
 
 TEST_CASE("Key scheduling") {
-    aes128 aes; // NOLINT(*-pro-type-member-init)
+    AES128 aes; // NOLINT(*-pro-type-member-init)
     aes.set_key(schedule);
-    REQUIRE(std::equal(schedule, schedule + 11 * 16, aes128_test::get_schedule(aes)));
+    REQUIRE(std::equal(schedule, schedule + 11 * 16, AES128Test::get_schedule(aes)));
 }
 
 TEST_CASE("Encrypt and Decrypt") {
-    aes128 aes; // NOLINT(*-pro-type-member-init)
+    AES128 aes; // NOLINT(*-pro-type-member-init)
     const unsigned char key[16] = {0, 9, 13, 11, 11, 14, 9, 13, 13, 11, 14, 9, 9, 13, 11, 14};
     const unsigned char original[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     unsigned char block[16];

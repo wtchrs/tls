@@ -1,21 +1,17 @@
-//
-// Created by wtchr on 8/5/2024.
-//
-
 #include "tls/diffie_hellman.h"
 #include <catch2/catch_test_macros.hpp>
+#include <cstddef>
 #include <iostream>
-#include "tls/mpz.h"
 
 TEST_CASE("Diffie Hellman Key Exchange") {
-    diffie_hellman alice, bob;
-    REQUIRE(alice.set_peer_public_key(bob.y) == bob.set_peer_public_key(alice.y));
-    REQUIRE(alice.K == bob.K);
+    DiffieHellman alice, bob;
+    REQUIRE(alice.set_peer_public_key(bob.y_) == bob.set_peer_public_key(alice.y_));
+    REQUIRE(alice.K_ == bob.K_);
 }
 
 TEST_CASE("Elliptic Curve Test") {
-    ec_field f{2, 2, 17};
-    ec_point p{5, 1, f};
+    ECField f{2, 2, 17};
+    ECPoint p{5, 1, f};
     for (int i = 1; i <= 20; i++)
         std::cout << i * p;
     auto xA = 3 * p;
@@ -165,15 +161,15 @@ TEST_CASE("Elliptic Curve secp256k1") {
             mpz_class{"0xB7C52588D95C3B9AA25B0403F1EEF75702E84BB7597AABE663B82F6F04EF2777"}
     };
 
-    ec_field secp256k1{0, 7, mpz_class{"0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"}};
-    ec_point G{
+    ECField secp256k1{0, 7, mpz_class{"0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"}};
+    ECPoint G{
             mpz_class{"0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"},
             mpz_class{"0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"}, secp256k1
     };
 
-    for (int i = 0; i < sizeof(secp256k1) / sizeof(mpz_class); i += 3) {
+    for (size_t i = 0; i < sizeof(secp256k1) / sizeof(mpz_class); i += 3) {
         auto P = test_vector[i] * G;
-        REQUIRE(P.x == test_vector[i + 1]);
-        REQUIRE(P.y == test_vector[i + 2]);
+        REQUIRE(P.x_ == test_vector[i + 1]);
+        REQUIRE(P.y_ == test_vector[i + 2]);
     }
 }
