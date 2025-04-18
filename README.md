@@ -30,6 +30,39 @@ keytool -printcert -v -file fullchain1.pem
 openssl rsa -in privkey1.pem -text
 ```
 
+## Add CMake preset
+
+Add the CMakeUserPresets.json file to the project root directory:
+
+```json
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "default",
+      "inherits": "vcpkg",
+      "environment": {
+        "VCPKG_ROOT": "<Your vcpkg installation directory>"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error", "stopOnFailure": false}
+    }
+  ]
+}
+```
+
 ## Run tests
 
 Use the following commands to configure, build, and test:

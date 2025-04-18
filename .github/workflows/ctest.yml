@@ -22,6 +22,6 @@ jobs:
       - name: Build and Test
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "release"
-          buildPreset: "release"
-          testPreset: "release"
+          configurePreset: "default"
+          buildPreset: "default"
+          testPreset: "default"

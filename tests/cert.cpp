@@ -48,7 +48,7 @@ TEST_CASE("Parse integer DER") {
 
 TEST_CASE("Parse certificate in file as JSON value") {
     INFO("Current path: " << std::filesystem::current_path());
-    const char *cert_file = "../../cert/example/server-cert.pem";
+    const char *cert_file = "../cert/example/server-cert.pem";
     std::ifstream f(cert_file);
     if (!f.is_open()) {
         FAIL("Failed to open certificate file: " << cert_file);
