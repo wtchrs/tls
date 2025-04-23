@@ -1,7 +1,7 @@
-#include "tls/ecdsa.h"
+#include "core/ecdsa.h"
 
 #include <cassert>
-#include "tls/mpz.h"
+#include "core/mpz.h"
 
 ECDSA::ECDSA(const ECPoint &G, mpz_class n)
     : ECPoint{G} {

@@ -1,4 +1,4 @@
-#include "tls/diffie_hellman.h"
+#include "core/diffie_hellman.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <iostream>

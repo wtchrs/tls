@@ -1,6 +1,6 @@
-#include "tls/cert.h"
-#include "tls/base64.h"
-#include "tls/der.h"
+#include "core/cert.h"
+#include "core/base64.h"
+#include "core/der.h"
 #include "util.h"
 
 #include <catch2/catch_message.hpp>
@@ -48,7 +48,7 @@ TEST_CASE("Parse integer DER") {
 
 TEST_CASE("Parse certificate in file as JSON value") {
     INFO("Current path: " << std::filesystem::current_path());
-    const char *cert_file = "../cert/example/server-cert.pem";
+    const char *cert_file = "./cert/example/server-cert.pem";
     std::ifstream f(cert_file);
     if (!f.is_open()) {
         FAIL("Failed to open certificate file: " << cert_file);

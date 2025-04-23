@@ -1,7 +1,7 @@
-#include "tls/ecdsa.h"
+#include "core/ecdsa.h"
 #include <catch2/catch_test_macros.hpp>
 #include <nettle/sha.h>
-#include "tls/mpz.h"
+#include "core/mpz.h"
 
 TEST_CASE("ECDSA") {
     const ECField secp256r1{

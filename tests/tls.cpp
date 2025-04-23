@@ -1,10 +1,10 @@
-#include "tls/tls.h"
+#include "core/tls.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
 #include "aes_test.h"
-#include "tls/aes.h"
-#include "tls/cipher_mode.h"
+#include "core/aes.h"
+#include "core/cipher_mode.h"
 #include "util.h"
 
 class GCMTest : public GCM<AES128> {
@@ -92,64 +92,57 @@ TEST_CASE("Test TLS without other layer") {
         FAIL("Failed CLIENT_HELLO: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "client_hello - OK" << std::endl << std::endl
-              << "server_hello - START" << std::endl;
+    std::cerr << "client_hello - OK" << std::endl << std::endl << "server_hello - START" << std::endl;
 
     if (auto r = client.server_hello(server.server_hello()); !r.empty()) {
         FAIL("Failed SERVER_HELLO: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "server_hello - OK" << std::endl << std::endl
-              << "server_certificate - START" << std::endl;
+    std::cerr << "server_hello - OK" << std::endl << std::endl << "server_certificate - START" << std::endl;
 
     if (auto r = client.server_certificate(server.server_certificate()); !r.empty()) {
         FAIL("Failed SERVER_CERTIFICATE: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "server_certificate - OK" << std::endl << std::endl
-              << "server_key_exchange - START" << std::endl;
+    std::cerr << "server_certificate - OK" << std::endl << std::endl << "server_key_exchange - START" << std::endl;
 
     if (auto r = client.server_key_exchange(server.server_key_exchange()); !r.empty()) {
         FAIL("Failed SERVER_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "server_key_exchange - OK" << std::endl << std::endl
-              << "server_hello_done - START" << std::endl;
+    std::cerr << "server_key_exchange - OK" << std::endl << std::endl << "server_hello_done - START" << std::endl;
 
     if (auto r = client.server_hello_done(server.server_hello_done()); !r.empty()) {
         FAIL("Failed SERVER_HELLO_DONE: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "server_hello_done - OK" << std::endl << std::endl
-              << "client_key_exchange - START" << std::endl;
+    std::cerr << "server_hello_done - OK" << std::endl << std::endl << "client_key_exchange - START" << std::endl;
 
     if (auto r = server.client_key_exchange(client.client_key_exchange()); !r.empty()) {
         FAIL("Failed CLIENT_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "client_key_exchange - OK" << std::endl << std::endl
+    std::cerr << "client_key_exchange - OK" << std::endl
+              << std::endl
               << "client_change_cipher_spec - START" << std::endl;
 
     if (auto r = server.change_cipher_spec(client.change_cipher_spec()); !r.empty()) {
         FAIL("Failed CLIENT_CHANGE_CIPHER_SPEC: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "client_change_cipher_spec - OK" << std::endl << std::endl
-              << "client_finished - START" << std::endl;
+    std::cerr << "client_change_cipher_spec - OK" << std::endl << std::endl << "client_finished - START" << std::endl;
 
     if (auto r = server.finished(client.finished()); !r.empty()) {
         FAIL("Failed CLIENT_FINISHED: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "client_finished - OK" << std::endl << std::endl
-              << "server_change_cipher_spec - START" << std::endl;
+    std::cerr << "client_finished - OK" << std::endl << std::endl << "server_change_cipher_spec - START" << std::endl;
 
     if (auto r = client.change_cipher_spec(server.change_cipher_spec()); !r.empty()) {
         FAIL("Failed SERVER_CHANGE_CIPHER_SPEC: " << bytes_to_hex(r.cbegin(), r.cend()));
     }
 
-    std::cerr << "server_change_cipher_spec - OK" << std::endl << std::endl
-              << "server_finished - START" << std::endl;
+    std::cerr << "server_change_cipher_spec - OK" << std::endl << std::endl << "server_finished - START" << std::endl;
 
     if (auto r = client.finished(server.finished()); !r.empty()) {
         FAIL("Failed SERVER_FINISHED: " << bytes_to_hex(r.cbegin(), r.cend()));

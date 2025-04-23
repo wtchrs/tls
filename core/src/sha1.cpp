@@ -1,7 +1,7 @@
-#include "tls/sha/sha1.h"
+#include "core/sha/sha1.h"
 
 #include <algorithm>
-#include "tls/mpz.h"
+#include "core/mpz.h"
 
 static uint32_t left_rotate(const uint32_t a, const int bits) {
     return a << bits | a >> (32 - bits);

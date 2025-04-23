@@ -1,4 +1,4 @@
-#include "tls/aes.h"
+#include "core/aes.h"
 #include <algorithm>
 
 void AES128::set_key(const unsigned char *key) {
@@ -83,15 +83,9 @@ void AES128::mix_column(unsigned char *msg) {
             for (int i = 0; i < 4; ++i) {
                 const unsigned char d = msg[4 * x + i];
                 switch (mix[y][i]) {
-                case 1:
-                    c[i] = d;
-                    break;
-                case 2:
-                    c[i] = d << 1;
-                    break;
-                case 3:
-                    c[i] = d << 1 ^ d;
-                    break;
+                case 1: c[i] = d; break;
+                case 2: c[i] = d << 1; break;
+                case 3: c[i] = d << 1 ^ d; break;
                 default:;
                 }
                 if (d & 0x80 && mix[y][i] != 1)
@@ -112,18 +106,10 @@ void AES128::inv_mix_column(unsigned char *msg) {
             for (int i = 0; i < 4; ++i) {
                 const unsigned char d = msg[4 * x + i];
                 switch (inv_mix[y][i]) {
-                case 9:
-                    c[i] = doub(doub(doub(d))) ^ d;
-                    break;
-                case 11:
-                    c[i] = doub(doub(doub(d)) ^ d) ^ d;
-                    break;
-                case 13:
-                    c[i] = doub(doub(doub(d) ^ d)) ^ d;
-                    break;
-                case 14:
-                    c[i] = doub(doub(doub(d) ^ d) ^ d);
-                    break;
+                case 9: c[i] = doub(doub(doub(d))) ^ d; break;
+                case 11: c[i] = doub(doub(doub(d)) ^ d) ^ d; break;
+                case 13: c[i] = doub(doub(doub(d) ^ d)) ^ d; break;
+                case 14: c[i] = doub(doub(doub(d) ^ d) ^ d); break;
                 default:;
                 }
             }

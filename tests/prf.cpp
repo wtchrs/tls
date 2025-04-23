@@ -1,10 +1,10 @@
-#include "tls/prf.h"
+#include "core/prf.h"
 #include <catch2/catch_test_macros.hpp>
 #include <gmp.h>
 #include <gmpxx.h>
 #include <vector>
-#include "tls/mpz.h"
-#include "tls/sha/sha1.h"
+#include "core/mpz.h"
+#include "core/sha/sha1.h"
 
 TEST_CASE("PRF test") {
     PRF<SHA1> prf;

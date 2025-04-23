@@ -1,7 +1,7 @@
-#include "tls/cipher_mode.h"
+#include "core/cipher_mode.h"
 #include <catch2/catch_test_macros.hpp>
 #include <nettle/gcm.h>
-#include "tls/aes.h"
+#include "core/aes.h"
 
 TEST_CASE("CBC") {
     CBC<AES128> cbc;

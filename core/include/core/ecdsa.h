@@ -3,7 +3,7 @@
 
 
 #include <gmpxx.h>
-#include "diffie_hellman.h"
+#include "core/diffie_hellman.h"
 
 
 /**

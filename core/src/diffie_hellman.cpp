@@ -1,8 +1,8 @@
-#include "tls/diffie_hellman.h"
+#include "core/diffie_hellman.h"
 
 #include <cassert>
 #include <vector>
-#include "tls/mpz.h"
+#include "core/mpz.h"
 
 // diffie_hellman
 

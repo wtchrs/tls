@@ -2,7 +2,7 @@
 #define SHA2_H
 
 
-#include "tls/sha/sha2_base.h"
+#include "core/sha/sha2_base.h"
 
 
 /**

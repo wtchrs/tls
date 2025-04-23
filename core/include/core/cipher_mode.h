@@ -7,7 +7,7 @@
 #include <cassert>
 #include <cstddef>
 #include <vector>
-#include "mpz.h"
+#include "core/mpz.h"
 
 
 template<typename Cipher>

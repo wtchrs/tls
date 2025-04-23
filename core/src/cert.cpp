@@ -1,4 +1,4 @@
-#include "tls/cert.h"
+#include "core/cert.h"
 #include <array>
 #include <gmpxx.h>
 #include <iomanip>
@@ -6,8 +6,8 @@
 #include <optional>
 #include <sstream>
 #include <string>
-#include "tls/base64.h"
-#include "tls/der.h"
+#include "core/base64.h"
+#include "core/der.h"
 
 std::string get_certificate_core(std::istream &is) {
     std::string s, r;

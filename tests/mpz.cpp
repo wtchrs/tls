@@ -1,4 +1,4 @@
-#include "tls/mpz.h"
+#include "core/mpz.h"
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("mpz") {

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
-#include "tls/network_utils.h"
+#include "core/network_utils.h"
 
 // Define the operations used in the SHA-2 hash computation.
 

@@ -1,5 +1,5 @@
-#include "tls/rsa.h"
-#include "tls/mpz.h"
+#include "core/rsa.h"
+#include "core/mpz.h"
 
 RSA::RSA(const int key_size) {
     // Generate two random primes p and q

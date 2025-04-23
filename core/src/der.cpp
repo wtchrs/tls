@@ -1,11 +1,11 @@
-#include "tls/der.h"
+#include "core/der.h"
 
 #include <ios>
 #include <istream>
 #include <json/json.h>
 #include <optional>
 #include <vector>
-#include "tls/mpz.h"
+#include "core/mpz.h"
 
 static der::Type read_type(const unsigned char c);
 static std::optional<size_t> read_length(std::istream &is);
@@ -116,8 +116,7 @@ static std::optional<Json::Value> read_sub_value(std::istream &is, der::PC pc, d
 static Json::Value type_change(const der::Tag tag, std::vector<unsigned char> v) {
     switch (tag) {
     case der::EOC:
-    case der::BOOLEAN:
-        return v[0] ? true : false;
+    case der::BOOLEAN: return v[0] ? true : false;
 
     case der::INTEGER:
     case der::BIT_STRING:
@@ -133,12 +132,10 @@ static Json::Value type_change(const der::Tag tag, std::vector<unsigned char> v)
         return result;
     }
 
-    case der::NULL_TYPE:
-        return "null";
+    case der::NULL_TYPE: return "null";
 
     case der::EXTERNAL:
-    case der::REAL:
-        return *reinterpret_cast<float *>(v.data());
+    case der::REAL: return *reinterpret_cast<float *>(v.data());
 
     case der::ENUMERATED:
     case der::EMBEDDED_PDV:

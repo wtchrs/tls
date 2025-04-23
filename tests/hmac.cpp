@@ -1,8 +1,8 @@
-#include "tls/hmac.h"
+#include "core/hmac.h"
 #include <catch2/catch_test_macros.hpp>
 
-#include "tls/mpz.h"
-#include "tls/sha/sha1.h"
+#include "core/mpz.h"
+#include "core/sha/sha1.h"
 
 TEST_CASE("HMAC-SHA1") {
     const std::string data[] = {

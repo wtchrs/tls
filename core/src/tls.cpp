@@ -1,4 +1,4 @@
-#include "tls/tls.h"
+#include "core/tls.h"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -12,14 +12,14 @@
 #include <sstream>
 #include <utility>
 #include <vector>
-#include "tls/base64.h"
-#include "tls/cert.h"
-#include "tls/der.h"
-#include "tls/diffie_hellman.h"
-#include "tls/mpz.h"
-#include "tls/prf.h"
-#include "tls/rsa.h"
-#include "tls/sha/sha2.h"
+#include "core/base64.h"
+#include "core/cert.h"
+#include "core/der.h"
+#include "core/diffie_hellman.h"
+#include "core/mpz.h"
+#include "core/prf.h"
+#include "core/rsa.h"
+#include "core/sha/sha2.h"
 
 constexpr size_t RANDOM_SIZE = 32; // Size of client random and server random
 constexpr size_t PUBKEY_SIZE = 69;
@@ -27,7 +27,7 @@ constexpr size_t MESSAGE_TO_HASH_SIZE = RANDOM_SIZE * 2 + PUBKEY_SIZE;
 constexpr size_t RSA_SIG_SIZE = 256;
 
 std::string init_certificate() {
-    std::ifstream cert_pem{"../cert/example/cert.pem"};
+    std::ifstream cert_pem{"./cert/example/cert.pem"};
     std::vector<unsigned char> r = {HANDSHAKE, 3, 3, 0, 0, CERTIFICATE, 0, 0, 0, 0, 0, 0};
     for (std::string s; !(s = get_certificate_core(cert_pem)).empty();) {
         auto v = base64_decode(s);
@@ -42,7 +42,7 @@ std::string init_certificate() {
 }
 
 RSA init_rsa() {
-    std::ifstream prv_pem{"../cert/example/key.pem"};
+    std::ifstream prv_pem{"./cert/example/key.pem"};
     if (!prv_pem.is_open()) {
         throw "Failed to open the private key PEM file.";
     }

@@ -6,11 +6,11 @@
 #include <gmpxx.h>
 #include <optional>
 #include <utility>
-#include "tls/aes.h"
-#include "tls/cipher_mode.h"
-#include "tls/diffie_hellman.h"
-#include "tls/mpz.h"
-#include "tls/rsa.h"
+#include "core/aes.h"
+#include "core/cipher_mode.h"
+#include "core/diffie_hellman.h"
+#include "core/mpz.h"
+#include "core/rsa.h"
 
 /**
  * @brief A template class implementing the TLS protocol.
@@ -25,9 +25,7 @@
  */
 template<bool SV = true>
 class TLS {
-    // TODO: recover back
-// protected:
-public:
+protected:
     GCM<AES128> aes_[2] = {}; ///< GCM mode AES-128 cipher
     mpz_class enc_seq_num_ = 0, dec_seq_num_ = 0; ///< Sequence number for encryption and decryption
 
