@@ -18,6 +18,7 @@ add_compile_definitions(PRINT_LOG)
 
 # Subdirectories
 add_subdirectory(core)
+add_subdirectory(tcp)
 add_subdirectory(tests)
 
 # Test configurations
