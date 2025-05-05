@@ -107,7 +107,7 @@ TEST_CASE("Test TLS without other layer") {
     std::cerr << "server_certificate - OK" << std::endl << std::endl << "server_key_exchange - START" << std::endl;
 
     if (auto r = client.server_key_exchange(server.server_key_exchange()); !r.empty()) {
-        FAIL("Failed SERVER_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend()));
+        FAIL("Failed SERVER_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend())); // TODO: Failed intermittently
     }
 
     std::cerr << "server_key_exchange - OK" << std::endl << std::endl << "server_hello_done - START" << std::endl;

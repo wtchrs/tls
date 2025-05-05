@@ -23,9 +23,14 @@ mpz_class random_prime(const unsigned b) {
     mpz_class z;
     do {
         std::uniform_int_distribution di{0, 0xff};
+        /*
         std::random_device rd;
         for (size_t i = 0; i < b; ++i)
             arr[i] = di(rd);
+        */
+        std::mt19937 instance;
+        for (size_t i = 0; i < b; ++i)
+            arr[i] = di(instance);
         z = nextprime(bnd2mpz(arr.begin(), arr.end()));
         std::fill(arr.begin(), arr.end(), 0xff);
         // Retry if z is larger than b bytes
