@@ -1,5 +1,5 @@
-#ifndef HTTP_H
-#define HTTP_H
+#ifndef TCP_HTTP_H
+#define TCP_HTTP_H
 
 
 #include <cstdint>
