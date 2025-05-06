@@ -1,4 +1,5 @@
 find_package(jsoncpp REQUIRED CONFIG)
+find_package(spdlog CONFIG REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(gmpxx REQUIRED IMPORTED_TARGET gmpxx)
@@ -26,4 +27,5 @@ target_link_libraries(core PUBLIC
         PkgConfig::nettle
         PkgConfig::hogweed
         JsonCpp::JsonCpp
+        spdlog::spdlog
 )

@@ -5,6 +5,13 @@
 #include <random>
 #include <vector>
 
+#ifdef TESTING
+static std::mt19937 rng;
+#else
+// TODO: Use CSPRNG instead of mt19937
+static std::mt19937 rng{std::random_device{}()};
+#endif
+
 mpz_class nextprime(const mpz_class &n) {
     mpz_class r;
     mpz_nextprime(r.get_mpz_t(), n.get_mpz_t());
@@ -20,17 +27,12 @@ mpz_class powm(const mpz_class &base, const mpz_class &exp, const mpz_class &mod
 
 mpz_class random_prime(const unsigned b) {
     std::vector<unsigned char> arr(b);
+    std::uniform_int_distribution di{0, 0xff};
     mpz_class z;
     do {
-        std::uniform_int_distribution di{0, 0xff};
-        /*
-        std::random_device rd;
-        for (size_t i = 0; i < b; ++i)
-            arr[i] = di(rd);
-        */
-        std::mt19937 instance;
-        for (size_t i = 0; i < b; ++i)
-            arr[i] = di(instance);
+        for (size_t i = 0; i < b; ++i) {
+            arr[i] = di(rng);
+        }
         z = nextprime(bnd2mpz(arr.begin(), arr.end()));
         std::fill(arr.begin(), arr.end(), 0xff);
         // Retry if z is larger than b bytes
