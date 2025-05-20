@@ -11,6 +11,8 @@ AllowShortBlocksOnASingleLine: Empty
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: false
+BinPackParameters: false
 BreakAfterAttributes: Leave
 BraceWrapping:
   AfterCaseLabel: false
@@ -34,7 +36,7 @@ BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeComma
 ColumnLimit: 120
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
-ContinuationIndentWidth: 8
+ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 IncludeCategories:
   - Regex: "^<.*"
@@ -46,7 +48,7 @@ IncludeCategories:
 IncludeIsMainRegex: "([-_](test|unittest))?$"
 IndentCaseLabels: false
 IndentWidth: 4
-IndentWrappedFunctionNames: true
+IndentWrappedFunctionNames: false
 InsertNewlineAtEOF: true
 MacroBlockBegin: ""
 MacroBlockEnd: ""

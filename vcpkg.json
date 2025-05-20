@@ -2,9 +2,10 @@
   "name": "custom-tls",
   "version": "0.1",
   "dependencies": [
+    "catch2",
     "gmp",
     "jsoncpp",
     "nettle",
-    "catch2"
+    "spdlog"
   ]
 }

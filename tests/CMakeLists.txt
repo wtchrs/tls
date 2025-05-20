@@ -13,6 +13,7 @@ file(GLOB_RECURSE TEST_SOURCES
         rsa.cpp
         sha.cpp
         tls.cpp
+        test_config.cpp
 )
 
 add_executable(tests ${TEST_SOURCES})

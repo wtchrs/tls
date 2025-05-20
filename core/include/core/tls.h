@@ -12,6 +12,9 @@
 #include "core/mpz.h"
 #include "core/rsa.h"
 
+constexpr bool TLS_SERVER = true;
+constexpr bool TLS_CLIENT = false;
+
 /**
  * @brief A template class implementing the TLS protocol.
  *
