@@ -27,7 +27,7 @@ pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
 
 # Subdirectories
 add_subdirectory(core)
-add_subdirectory(tcp)
+add_subdirectory(protocol)
 add_subdirectory(tests)
 
 # Test configurations

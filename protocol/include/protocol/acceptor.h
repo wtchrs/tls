@@ -1,11 +1,11 @@
-#ifndef TCP_ACCEPTOR_H
-#define TCP_ACCEPTOR_H
+#ifndef PROTOCOL_ACCEPTOR_H
+#define PROTOCOL_ACCEPTOR_H
 
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <sys/socket.h>
-#include "tcp/layer.h"
+#include "protocol/layer.h"
 
 class ServerAcceptor {
     using LayerFactory = std::function<std::unique_ptr<Layer>(int)>;

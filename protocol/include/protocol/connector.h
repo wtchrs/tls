@@ -1,11 +1,11 @@
-#ifndef TCP_CONNECTOR_H
-#define TCP_CONNECTOR_H
+#ifndef PROTOCOL_CONNECTOR_H
+#define PROTOCOL_CONNECTOR_H
 
 
 #include <functional>
 #include <memory>
 #include <string>
-#include "tcp/layer.h"
+#include "protocol/layer.h"
 
 class Connector {
     using LayerFactory = std::function<std::unique_ptr<Layer>(int)>;

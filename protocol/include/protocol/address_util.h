@@ -1,5 +1,5 @@
-#ifndef TCP_ADDRESS_UTIL_H
-#define TCP_ADDRESS_UTIL_H
+#ifndef PROTOCOL_ADDRESS_UTIL_H
+#define PROTOCOL_ADDRESS_UTIL_H
 
 
 #include <netdb.h>

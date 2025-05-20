@@ -1,7 +1,7 @@
-#include "tcp/connector.h"
+#include "protocol/connector.h"
 #include <spdlog/spdlog.h>
 #include <sys/socket.h>
-#include "tcp/address_util.h"
+#include "protocol/address_util.h"
 
 std::unique_ptr<Layer> Connector::connect_to(const std::string &host, const std::string &port) {
     sockaddr_storage addr{};

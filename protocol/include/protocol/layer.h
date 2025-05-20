@@ -1,5 +1,5 @@
-#ifndef TCP_LAYER_H
-#define TCP_LAYER_H
+#ifndef PROTOCOL_LAYER_H
+#define PROTOCOL_LAYER_H
 
 
 #include <memory>
