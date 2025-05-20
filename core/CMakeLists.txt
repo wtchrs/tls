@@ -1,11 +1,3 @@
-find_package(jsoncpp REQUIRED CONFIG)
-find_package(spdlog CONFIG REQUIRED)
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(gmpxx REQUIRED IMPORTED_TARGET gmpxx)
-pkg_check_modules(nettle REQUIRED IMPORTED_TARGET nettle)
-pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
-
 file(GLOB_RECURSE SOURCES
         src/aes.cpp
         src/base64.cpp
@@ -27,5 +19,5 @@ target_link_libraries(core PUBLIC
         PkgConfig::nettle
         PkgConfig::hogweed
         JsonCpp::JsonCpp
-        spdlog::spdlog
 )
+target_link_libraries(core PRIVATE spdlog::spdlog)

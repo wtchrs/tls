@@ -16,6 +16,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Add custom flags
 add_compile_definitions(PRINT_LOG)
 
+# Dependencies
+find_package(jsoncpp REQUIRED CONFIG)
+find_package(spdlog CONFIG REQUIRED)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(gmpxx REQUIRED IMPORTED_TARGET gmpxx)
+pkg_check_modules(nettle REQUIRED IMPORTED_TARGET nettle)
+pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
+
 # Subdirectories
 add_subdirectory(core)
 add_subdirectory(tcp)
