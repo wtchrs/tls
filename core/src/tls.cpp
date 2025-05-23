@@ -312,8 +312,8 @@ std::string TLS<SV>::client_hello(std::string &&s) {
     if constexpr (!SV) {
         // client
         client_hello_message msg;
-        msg.tls.set_length(sizeof(client_hello_message) - sizeof(TLS_header));
-        msg.handshake.set_length(sizeof(client_hello_message) - sizeof(TLS_header) - sizeof(hello_common));
+        msg.tls.set_length(sizeof(msg) - sizeof(msg.tls));
+        msg.handshake.set_length(sizeof(msg) - sizeof(msg.tls) - sizeof(msg.handshake));
         mpz2bnd(random_prime(32), msg.hello.random, msg.hello.random + 32);
         std::copy_n(msg.hello.random, 32, client_random_.data());
         return accumulate(struct2str(msg));
