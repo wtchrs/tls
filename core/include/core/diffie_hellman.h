@@ -2,7 +2,9 @@
 #define DIFFIE_HELLMAN_H
 
 
+#include <fmt/core.h>
 #include <gmpxx.h>
+#include <sstream>
 
 
 /**
@@ -109,6 +111,24 @@ public:
      * @return The output stream with the point's coordinates written to it.
      */
     friend std::ostream &operator<<(std::ostream &os, const ECPoint &r);
+
+    friend struct fmt::formatter<ECPoint>;
+};
+
+
+template<>
+struct fmt::formatter<ECPoint> {
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext &ctx) {
+        return ctx.begin();
+    }
+
+    template<typename FormatContext>
+    auto format(const ECPoint &value, FormatContext &ctx) {
+        std::ostringstream oss;
+        oss << value;
+        return fmt::format_to(ctx.out(), "{}", oss.str());
+    }
 };
 
 

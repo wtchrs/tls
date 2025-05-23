@@ -31,7 +31,7 @@ TEST_CASE("GCM") {
     mpz2bnd(random_prime(12), IV, IV + 12);
     mpz2bnd(random_prime(48), P, P + 48);
     SECTION("GCM compare with nettle") {
-        gcm_aes128_ctx ctx; // NOLINT(*-pro-type-member-init)
+        gcm_aes128_ctx ctx{};
         gcm_aes128_set_key(&ctx, K);
         gcm_aes128_set_iv(&ctx, 12, IV);
         gcm_aes128_update(&ctx, 28, A);

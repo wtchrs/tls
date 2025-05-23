@@ -6,8 +6,7 @@
 struct TestListener : Catch::EventListenerBase {
     using Catch::EventListenerBase::EventListenerBase;
 
-    // NOLINTNEXTLINE(clang-diagnostic-unused-parameter)
-    void testRunStarting(const Catch::TestRunInfo &test_run_info) override {
+    void testRunStarting(const Catch::TestRunInfo &) override {
         spdlog::cfg::load_env_levels();
     }
 };

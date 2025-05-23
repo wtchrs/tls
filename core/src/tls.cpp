@@ -9,6 +9,7 @@
 #include <iostream>
 #include <optional>
 #include <ostream>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -130,8 +131,8 @@ struct client_hello_message {
 struct server_hello_message {
     TLS_header tls{.length = {0, sizeof(server_hello_message) - sizeof(TLS_header)}};
     handshake_header handshake{
-            .handshake_type = SERVER_HELLO,
-            .length = {0, 0, sizeof(server_hello_message) - sizeof(TLS_header) - sizeof(handshake_header)},
+        .handshake_type = SERVER_HELLO,
+        .length = {0, 0, sizeof(server_hello_message) - sizeof(TLS_header) - sizeof(handshake_header)},
     };
     hello_common hello;
     /**
@@ -387,7 +388,7 @@ std::string TLS<SV>::server_certificate(std::string &&s) {
         // Read the first certificate and extract public key parameters.
         auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
         if (!opt_pubkey) {
-            std::cerr << "Failed to parse the received certificate.";
+            spdlog::error("Failed to parse the received certificate.");
             return alert(2, 44);
         }
         auto [K, e, sign] = *opt_pubkey;
@@ -416,8 +417,9 @@ void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) co
     std::copy(hash.cbegin(), hash.cend(), ptr);
     *--ptr = hash.size(); // Add hash size (0x20) before hash value
     // der is depending on the signature method.
-    constexpr unsigned char SHA256_DER[] = {0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
-                                            0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04};
+    constexpr unsigned char SHA256_DER[] = {
+        0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04
+    };
     ptr -= sizeof(SHA256_DER);
     std::copy_n(SHA256_DER, sizeof(SHA256_DER), ptr);
     *--ptr = hash.size() + sizeof(SHA256_DER) + 1; // Add length (0x31)
@@ -490,17 +492,14 @@ std::string TLS<SV>::server_key_exchange(std::string &&s) {
 
         SHA256 sha;
         auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
-        if (std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
-#ifdef PRINT_LOG
-            std::cerr << "server_key_exchange:client: Check signature - success" << std::endl;
-#endif
-            return "";
+
+        if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
+            spdlog::error("server_key_exchange:client: Check signature - fail");
+            return alert(2, 51); // decrypt error
         }
 
-#ifdef PRINT_LOG
-        std::cerr << "server_key_exchange:client: Check signature - fail" << std::endl;
-#endif
-        return alert(2, 51); // decrypt error
+        spdlog::info("server_key_exchange:client: Check signature - success");
+        return "";
     }
 }
 
@@ -647,7 +646,7 @@ int TLS<SV>::alert(std::string &&s) {
     }
 
     if (level == 1 || level == 2) {
-        std::cerr << s << std::endl;
+        spdlog::error("TLS Alert level {}: {}", level, s);
     }
 
     return desc;

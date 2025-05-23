@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ostream>
+#include <spdlog/spdlog.h>
 #include <sstream>
 
 TEST_CASE("Get certificate core") {
@@ -38,7 +39,7 @@ TEST_CASE("Parse integer DER") {
         FAIL("Failed to parse.");
     }
 
-    INFO("Parsed JSON value: " << *parsed);
+    spdlog::debug("Parsed JSON value: {}", parsed->toStyledString());
 
     auto str = (*parsed)[0].asString();
     if (str.compare(expected) != 0) {
@@ -47,7 +48,7 @@ TEST_CASE("Parse integer DER") {
 }
 
 TEST_CASE("Parse certificate in file as JSON value") {
-    INFO("Current path: " << std::filesystem::current_path());
+    spdlog::info("Current path: {}", std::filesystem::current_path().string());
     const char *cert_file = "./cert/example/server-cert.pem";
     std::ifstream f(cert_file);
     if (!f.is_open()) {
@@ -59,10 +60,10 @@ TEST_CASE("Parse certificate in file as JSON value") {
     for (uint8_t c : v) {
         ss << c;
     }
-    INFO("Decoded string: " << ss.str());
+    spdlog::debug("Decoded string: {}", bytes_to_hex(v.cbegin(), v.cend()));
     auto jsonValue = der2json(ss);
     if (jsonValue.has_value()) {
-        INFO("JSON form of the parsed certificate:\n" << (*jsonValue).toStyledString());
+        spdlog::debug("JSON form of the parsed certificate: {}", (*jsonValue).toStyledString());
     } else {
         FAIL("Failed to parse certificate.");
     }
