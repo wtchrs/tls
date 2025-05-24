@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "core/mpz.h"
 #include "core/network_utils.h"
 
 // Define the operations used in the SHA-2 hash computation.

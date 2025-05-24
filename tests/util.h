@@ -4,7 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#define EXPECTED(EXP, ACTUAL) FAIL("\nExpected:\t" << EXP << "\nActual:\t" << ACTUAL)
+#define REQUIRE_MESSAGE(EXPRESSION, MESSAGE) { INFO(MESSAGE); REQUIRE(EXPRESSION); }
 
 template<typename It>
 std::string bytes_to_hex(It begin, It end) {

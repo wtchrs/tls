@@ -21,11 +21,7 @@ TEST_CASE("Get certificate core") {
        << expected << std::endl
        << "-----END CERTIFICATE-----" << std::endl;
 
-    auto core = get_certificate_core(ss);
-
-    if (core.compare(expected) != 0) {
-        EXPECTED(expected, core);
-    }
+    REQUIRE(get_certificate_core(ss) == expected);
 }
 
 TEST_CASE("Parse integer DER") {
@@ -34,37 +30,28 @@ TEST_CASE("Parse integer DER") {
     std::istringstream iss{std::string{der_str}};
 
     auto parsed = der2json(iss);
-
-    if (!parsed) {
-        FAIL("Failed to parse.");
-    }
+    INFO("Failed to parse.");
+    REQUIRE(parsed.has_value());
 
     spdlog::debug("Parsed JSON value: {}", parsed->toStyledString());
-
-    auto str = (*parsed)[0].asString();
-    if (str.compare(expected) != 0) {
-        EXPECTED(expected, str);
-    }
+    REQUIRE((*parsed)[0].asString() == expected);
 }
 
 TEST_CASE("Parse certificate in file as JSON value") {
     spdlog::info("Current path: {}", std::filesystem::current_path().string());
     const char *cert_file = "./cert/example/server-cert.pem";
     std::ifstream f(cert_file);
-    if (!f.is_open()) {
-        FAIL("Failed to open certificate file: " << cert_file);
-    }
+    INFO("Failed to open certificate file: " << cert_file);
+    REQUIRE(f.is_open());
     std::string s = get_certificate_core(f);
     auto v = base64_decode(s);
     std::stringstream ss;
     for (uint8_t c : v) {
         ss << c;
     }
-    spdlog::debug("Decoded string: {}", bytes_to_hex(v.cbegin(), v.cend()));
+    spdlog::trace("Decoded string: {}", bytes_to_hex(v.cbegin(), v.cend()));
     auto jsonValue = der2json(ss);
-    if (jsonValue.has_value()) {
-        spdlog::debug("JSON form of the parsed certificate: {}", (*jsonValue).toStyledString());
-    } else {
-        FAIL("Failed to parse certificate.");
-    }
+    INFO("Failed to parse certificate.");
+    REQUIRE(jsonValue.has_value());
+    spdlog::trace("JSON form of the parsed certificate: {}", (*jsonValue).toStyledString());
 }

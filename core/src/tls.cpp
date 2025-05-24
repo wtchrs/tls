@@ -185,7 +185,7 @@ struct server_key_exchange_message {
      */
     uint8_t signature_sign = 1;
     uint8_t signature_length[2] = {1, 0}; // length: 256 (0x100)
-    uint8_t sign[256] = {};
+    uint8_t sign[RSA_SIG_SIZE] = {};
 };
 
 struct server_hello_done_message {
@@ -478,6 +478,10 @@ std::string TLS<SV_CLIENT>::server_key_exchange(std::string &&s) {
     SHA256 sha;
     auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
 
+    spdlog::debug("Encoded RSA Signature and hash must be same.");
+    spdlog::debug("Encoded RSA Signature: 0x{}", z.get_str(16));
+    spdlog::debug("Hash: 0x{}", bnd2mpz(hash.crbegin(), hash.crend()).get_str(16));
+
     if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
         spdlog::error("server_key_exchange:client: Check signature - fail");
         return alert(2, 51); // decrypt error
@@ -578,9 +582,14 @@ std::string TLS<SV>::finished(std::string &&s) {
         return encode(std::move(msg), HANDSHAKE);
     }
 
+    // Verify received message.
     const auto opt_result = decode(std::move(s));
-    if (!opt_result || *opt_result != msg) {
-        // Failed to parse received FINISHED message.
+    if (!opt_result) {
+        spdlog::error("Handshake verification failed: Decoding failed.");
+        return alert(2, 51);
+    }
+    if (*opt_result != msg) {
+        spdlog::error("Handshake verification failed: Not matched.");
         return alert(2, 51);
     }
 

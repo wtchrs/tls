@@ -5,6 +5,7 @@ AccessModifierOffset: -4
 AlignAfterOpenBracket: BlockIndent
 AlignConsecutiveAssignments: None
 AlignConsecutiveDeclarations: None
+AlignEscapedNewlines: Left
 AlignOperands: Align
 AlignTrailingComments: false
 AllowShortBlocksOnASingleLine: Empty
@@ -54,6 +55,7 @@ MacroBlockBegin: ""
 MacroBlockEnd: ""
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
+SkipMacroDefinitionBody: true
 SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: false
 SpaceBeforeRangeBasedForLoopColon: true

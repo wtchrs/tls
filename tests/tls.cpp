@@ -84,103 +84,80 @@ TEST_CASE("Test TLS without other layer") {
         client.set_aes(i, client_aes[i]);
     }
 
-    // ========== Perform TLS handshake ==========
+    // ========== TLS Handshake ==========
 
     spdlog::info("client_hello - START");
-
-    if (auto r = server.client_hello(client.client_hello()); !r.empty()) {
-        spdlog::error("Failed CLIENT_HELLO: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed CLIENT_HELLO");
-    }
-
+    auto r = server.client_hello(client.client_hello());
+    REQUIRE_MESSAGE(r.empty(), "Failed CLIENT_HELLO: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("client_hello - OK");
+
     spdlog::info("server_hello - START");
-
-    if (auto r = client.server_hello(server.server_hello()); !r.empty()) {
-        spdlog::error("Failed SERVER_HELLO: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed SERVER_HELLO");
-    }
-
+    r = client.server_hello(server.server_hello());
+    REQUIRE_MESSAGE(r.empty(), "Failed SERVER_HELLO: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_hello - OK");
+
     spdlog::info("server_certificate - START");
-
-    if (auto r = client.server_certificate(server.server_certificate()); !r.empty()) {
-        spdlog::error("Failed SERVER_CERTIFICATE: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed SERVER_CERTIFICATE");
-    }
-
+    r = client.server_certificate(server.server_certificate());
+    REQUIRE_MESSAGE(r.empty(), "Failed SERVER_CERTIFICATE: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_certificate - OK");
+
+    // TODO: Failed intermittently
     spdlog::info("server_key_exchange - START");
-
-    if (auto r = client.server_key_exchange(server.server_key_exchange()); !r.empty()) {
-        // TODO: Failed intermittently
-        spdlog::error("Failed SERVER_KEY_EXCHANGE: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed SERVER_KEY_EXCHANGE");
-    }
-
+    r = client.server_key_exchange(server.server_key_exchange());
+    REQUIRE_MESSAGE(r.empty(), "Failed SERVER_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_key_exchange - OK");
+
     spdlog::info("server_hello_done - START");
-
-    if (auto r = client.server_hello_done(server.server_hello_done()); !r.empty()) {
-        spdlog::error("Failed SERVER_HELLO_DONE: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed SERVER_HELLO_DONE");
-    }
-
+    r = client.server_hello_done(server.server_hello_done());
+    REQUIRE_MESSAGE(r.empty(), "Failed SERVER_HELLO_DONE: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_hello_done - OK");
+
     spdlog::info("client_key_exchange - START");
-
-    if (auto r = server.client_key_exchange(client.client_key_exchange()); !r.empty()) {
-        spdlog::error("Failed CLIENT_KEY_EXCHANGE: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed CLIENT_KEY_EXCHANGE");
-    }
-
+    r = server.client_key_exchange(client.client_key_exchange());
+    REQUIRE_MESSAGE(r.empty(), "Failed CLIENT_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("client_key_exchange - OK");
+
     spdlog::info("client_change_cipher_spec - START");
-
-    if (auto r = server.change_cipher_spec(client.change_cipher_spec()); !r.empty()) {
-        spdlog::error("Failed CLIENT_CHANGE_CIPHER_SPEC: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed CLIENT_CHANGE_CIPHER_SPEC");
-    }
-
+    r = server.change_cipher_spec(client.change_cipher_spec());
+    REQUIRE_MESSAGE(r.empty(), "Failed CLIENT_CHANGE_CIPHER_SPEC: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("client_change_cipher_spec - OK");
+
     spdlog::info("client_finished - START");
-
-    if (auto r = server.finished(client.finished()); !r.empty()) {
-        spdlog::error("Failed CLIENT_FINISHED: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed CLIENT_FINISHED");
-    }
-
+    r = server.finished(client.finished());
+    REQUIRE_MESSAGE(r.empty(), "Failed CLIENT_FINISHED: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("client_finished - OK");
+
     spdlog::info("server_change_cipher_spec - START");
-
-    if (auto r = client.change_cipher_spec(server.change_cipher_spec()); !r.empty()) {
-        spdlog::error("Failed SERVER_CHANGE_CIPHER_SPEC: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed SERVER_CHANGE_CIPHER_SPEC");
-    }
-
+    r = client.change_cipher_spec(server.change_cipher_spec());
+    REQUIRE_MESSAGE(r.empty(), "Failed SERVER_CHANGE_CIPHER_SPEC: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_change_cipher_spec - OK");
+
     spdlog::info("server_finished - START");
-
-    if (auto r = client.finished(server.finished()); !r.empty()) {
-        spdlog::error("Failed SERVER_FINISHED: {}", bytes_to_hex(r.cbegin(), r.cend()));
-        FAIL("Failed SERVER_FINISHED");
-    }
-
+    r = client.finished(server.finished());
+    REQUIRE_MESSAGE(r.empty(), "Failed SERVER_FINISHED: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_finished - OK");
 
-    // ========== Finished TLS handshake ==========
+    // ========== Check master secret, client random and server random ==========
 
-    REQUIRE(std::equal(
-        server.get_master_secret().begin(), server.get_master_secret().end(), client.get_master_secret().begin()
-    ));
-    REQUIRE(std::equal(
-        server.get_client_random().begin(), server.get_client_random().end(), client.get_client_random().begin()
-    ));
-    REQUIRE(std::equal(
-        server.get_server_random().begin(), server.get_server_random().end(), client.get_server_random().begin()
-    ));
+    // clang-format off
+    REQUIRE_MESSAGE(
+        std::equal( server.get_master_secret().begin(), server.get_master_secret().end(), client.get_master_secret().begin()),
+        "Server and client's master secrets are not equal."
+    );
+    REQUIRE_MESSAGE(
+        std::equal( server.get_client_random().begin(), server.get_client_random().end(), client.get_client_random().begin()),
+        "Server and client's client random values are not equal."
+    );
+    REQUIRE_MESSAGE(
+        std::equal( server.get_server_random().begin(), server.get_server_random().end(), client.get_server_random().begin()),
+        "Server and client's server random values are not equal."
+    );
+    // clang-format on
+
+    // ========== Check schedule ==========
 
     for (int i = 0; i < 2; i++) {
+        INFO("Server and client's " << i << "th schedule values are not equal.");
         REQUIRE(std::equal(
             AES128Test::get_schedule(((const GCMTest &) (server.get_aes(i))).get_cipher()),
             AES128Test::get_schedule(((const GCMTest &) (server.get_aes(i))).get_cipher()) + 11 * 16,
@@ -188,16 +165,15 @@ TEST_CASE("Test TLS without other layer") {
         ));
     }
 
+    // ========== Client send message ==========
+
     auto opt_cli_msg = server.decode(client.encode("hello world"));
-    REQUIRE((opt_cli_msg = server.decode(client.encode("hello world"))));
-    if (!opt_cli_msg) {
-        FAIL("Failed to decode client message");
-    }
-    REQUIRE(*opt_cli_msg == std::string{"hello world"});
+    REQUIRE_MESSAGE(opt_cli_msg.has_value(), "Server failed to decode client message. `opt_cli_msg` must have value.");
+    REQUIRE_MESSAGE(*opt_cli_msg == std::string{"hello world"}, "Server failed to decode client message.");
+
+    // ========== Server send message ==========
 
     auto opt_srv_msg = client.decode(server.encode("Hello, world!"));
-    if (!opt_srv_msg) {
-        FAIL("Failed to decode server message");
-    }
-    REQUIRE(*opt_srv_msg == std::string{"Hello, world!"});
+    REQUIRE_MESSAGE(opt_srv_msg.has_value(), "Client failed to decode server message. `opt_srv_msg` must have value.");
+    REQUIRE_MESSAGE(*opt_srv_msg == std::string{"Hello, world!"}, "Client failed to decode server message.");
 }

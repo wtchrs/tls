@@ -10,7 +10,9 @@ TEST_CASE("CBC") {
     cbc.set_key(key);
     cbc.set_iv(iv);
 
-    std::string msg = "Hello this is a test";
+    const std::string expected = "Hello this is a test";
+
+    std::string msg = expected;
     // PKCS7 padding
     const size_t padding_size = 16 - msg.size() % 16;
     msg.append(padding_size, static_cast<char>(padding_size));
@@ -18,9 +20,10 @@ TEST_CASE("CBC") {
     cbc.encrypt(p, msg.size());
     cbc.decrypt(p, msg.size());
     // PKCS7 unpadding
-    for (int pad = static_cast<unsigned char>(msg.back()); pad > 0; --pad)
+    for (int pad = static_cast<unsigned char>(msg.back()); pad > 0; --pad) {
         msg.pop_back();
-    REQUIRE(msg == "Hello this is a test");
+    }
+    REQUIRE(msg == expected);
 }
 
 TEST_CASE("GCM") {
