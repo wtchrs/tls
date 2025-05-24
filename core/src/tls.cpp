@@ -307,95 +307,92 @@ std::string TLS<SV>::encode(std::string &&s, const int type) {
 
 // ========== TLS<SV> CLASS METHOD IMPLEMENTATIONS ==========
 
-template<bool SV>
-std::string TLS<SV>::client_hello(std::string &&s) {
-    if constexpr (!SV) {
-        // client
-        client_hello_message msg;
-        msg.tls.set_length(sizeof(msg) - sizeof(msg.tls));
-        msg.handshake.set_length(sizeof(msg) - sizeof(msg.tls) - sizeof(msg.handshake));
-        mpz2bnd(random_prime(32), msg.hello.random, msg.hello.random + 32);
-        std::copy_n(msg.hello.random, 32, client_random_.data());
-        return accumulate(struct2str(msg));
-    } else {
-        // server
-        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
-            return alert(2, 10);
-        }
-        accumulate(s);
-        auto *received = reinterpret_cast<client_hello_message *>(s.data());
-        std::copy_n(received->hello.random, 32, client_random_.data());
-        const int len = received->get_cipher_suite_length();
-        const unsigned char *p = received->cipher_suite;
-        // Return null string if TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f) exists in cipher suite list.
-        for (int i = 0; i < len; i += 2) {
-            if (*(p + i) == 0xc0 && *(p + i + 1) == 0x2f) {
-                return "";
-            }
-        }
-        // If not, return alert message.
-        return alert(2, 40);
-    }
+template<>
+std::string TLS<SV_CLIENT>::client_hello(std::string &&) {
+    client_hello_message msg;
+    msg.tls.set_length(sizeof(msg) - sizeof(msg.tls));
+    msg.handshake.set_length(sizeof(msg) - sizeof(msg.tls) - sizeof(msg.handshake));
+    mpz2bnd(random_prime(32), msg.hello.random, msg.hello.random + 32);
+    std::copy_n(msg.hello.random, 32, client_random_.data());
+    return accumulate(struct2str(msg));
 }
 
-template<bool SV>
-std::string TLS<SV>::server_hello(std::string &&s) {
-    if constexpr (SV) {
-        // server
-        server_hello_message msg;
-        mpz2bnd(random_prime(32), server_random_.begin(), server_random_.end());
-        mpz2bnd(random_prime(32), session_id_.begin(), session_id_.end());
-        std::copy(server_random_.begin(), server_random_.end(), msg.hello.random);
-        std::copy(session_id_.cbegin(), session_id_.cend(), msg.hello.session_id);
-        return accumulate(struct2str(msg));
-    } else {
-        // client
-        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
-            return alert(2, 10);
-        }
-        accumulate(s);
-        const auto msg = reinterpret_cast<server_hello_message *>(s.data());
-        std::copy_n(msg->hello.random, 32, server_random_.begin());
-        std::copy_n(msg->hello.session_id, 32, session_id_.begin());
-        // Return null string if cipher suite is TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f).
-        if (msg->cipher_suite[0] == 0xc0 && msg->cipher_suite[1] == 0x2f) {
+template<>
+std::string TLS<SV_SERVER>::client_hello(std::string &&s) {
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
+        return alert(2, 10);
+    }
+    accumulate(s);
+    auto *received = reinterpret_cast<client_hello_message *>(s.data());
+    std::copy_n(received->hello.random, 32, client_random_.data());
+    const int len = received->get_cipher_suite_length();
+    const unsigned char *p = received->cipher_suite;
+    // Return null string if TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f) exists in cipher suite list.
+    for (int i = 0; i < len; i += 2) {
+        if (*(p + i) == 0xc0 && *(p + i + 1) == 0x2f) {
             return "";
         }
-        // If not, return alert message.
-        return alert(2, 40);
     }
+    // If not, return alert message.
+    return alert(2, 40);
 }
 
-template<bool SV>
-std::string TLS<SV>::server_certificate(std::string &&s) {
-    if constexpr (SV) {
-        // server
-        return accumulate(certificate_);
-    } else {
-        // client
-        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CERTIFICATE}) {
-            return alert(2, 10);
-        }
-        accumulate(s);
-        const auto msg = reinterpret_cast<certificate_message *>(s.data());
-        std::stringstream ss;
-        const uint8_t *p = msg->certificate_length[1]; // length of only the first certificate
-        // TODO: Change this method to check all certificate chains.
-        for (int i = 0, j = *p * 0x10000 + *(p + 1) * 0x100 + *(p + 2); i < j; i++) {
-            // Write bytes of the first certificate to ss
-            ss << std::noskipws << msg->certificate[i];
-        }
-        // Read the first certificate and extract public key parameters.
-        auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
-        if (!opt_pubkey) {
-            spdlog::error("Failed to parse the received certificate.");
-            return alert(2, 44);
-        }
-        auto [K, e, sign] = *opt_pubkey;
-        rsa_.K_ = K;
-        rsa_.e_ = e;
+template<>
+std::string TLS<SV_CLIENT>::server_hello(std::string &&s) {
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
+        return alert(2, 10);
+    }
+    accumulate(s);
+    const auto msg = reinterpret_cast<server_hello_message *>(s.data());
+    std::copy_n(msg->hello.random, 32, server_random_.begin());
+    std::copy_n(msg->hello.session_id, 32, session_id_.begin());
+    // Return null string if cipher suite is TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f).
+    if (msg->cipher_suite[0] == 0xc0 && msg->cipher_suite[1] == 0x2f) {
         return "";
     }
+    // If not, return alert message.
+    return alert(2, 40);
+}
+
+template<>
+std::string TLS<SV_SERVER>::server_hello(std::string &&) {
+    server_hello_message msg;
+    mpz2bnd(random_prime(32), server_random_.begin(), server_random_.end());
+    mpz2bnd(random_prime(32), session_id_.begin(), session_id_.end());
+    std::copy(server_random_.begin(), server_random_.end(), msg.hello.random);
+    std::copy(session_id_.cbegin(), session_id_.cend(), msg.hello.session_id);
+    return accumulate(struct2str(msg));
+}
+
+template<>
+std::string TLS<SV_CLIENT>::server_certificate(std::string &&s) {
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CERTIFICATE}) {
+        return alert(2, 10);
+    }
+    accumulate(s);
+    const auto msg = reinterpret_cast<certificate_message *>(s.data());
+    std::stringstream ss;
+    const uint8_t *p = msg->certificate_length[1]; // length of only the first certificate
+    // TODO: Change this method to check all certificate chains.
+    for (int i = 0, j = *p * 0x10000 + *(p + 1) * 0x100 + *(p + 2); i < j; i++) {
+        // Write bytes of the first certificate to ss
+        ss << std::noskipws << msg->certificate[i];
+    }
+    // Read the first certificate and extract public key parameters.
+    auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
+    if (!opt_pubkey) {
+        spdlog::error("Failed to parse the received certificate.");
+        return alert(2, 44);
+    }
+    auto [K, e, sign] = *opt_pubkey;
+    rsa_.K_ = K;
+    rsa_.e_ = e;
+    return "";
+}
+
+template<>
+std::string TLS<SV_SERVER>::server_certificate(std::string &&) {
+    return accumulate(certificate_);
 }
 
 template<bool SV>
@@ -457,92 +454,90 @@ void TLS<SV>::derive_keys(const mpz_class &premaster_secret) {
     aes_[1].set_iv(&v[36], 0, 4);
 }
 
-template<bool SV>
-std::string TLS<SV>::server_key_exchange(std::string &&s) {
-    if constexpr (SV) {
-        // server
-        server_key_exchange_message msg;
-        msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
-        msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-        msg.handshake.handshake_type = SERVER_KEY_EXCHANGE;
-        mpz2bnd(P_.x_, msg.x, msg.x + 32);
-        mpz2bnd(P_.y_, msg.y, msg.y + 32);
-        generate_signature(&msg.named_curve, msg.sign);
-        return accumulate(struct2str(msg));
-    } else {
-        // client
-        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
-            return alert(2, 10);
-        }
-        accumulate(s);
-        const auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
-        // Extract server's ephemeral public key from received message.
-        const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
-        // Compute shared key.
-        derive_keys((prv_key_ * Y).x_);
-
-        // Check signature.
-        auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + RSA_SIG_SIZE));
-        unsigned char check_sig[RSA_SIG_SIZE];
-        mpz2bnd(z, check_sig, check_sig + RSA_SIG_SIZE);
-        unsigned char check_hash[MESSAGE_TO_HASH_SIZE];
-        std::copy(client_random_.cbegin(), client_random_.cend(), check_hash);
-        std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + RANDOM_SIZE);
-        std::copy_n(&p->named_curve, PUBKEY_SIZE, check_hash + RANDOM_SIZE * 2);
-
-        SHA256 sha;
-        auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
-
-        if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
-            spdlog::error("server_key_exchange:client: Check signature - fail");
-            return alert(2, 51); // decrypt error
-        }
-
-        spdlog::info("server_key_exchange:client: Check signature - success");
-        return "";
+template<>
+std::string TLS<SV_CLIENT>::server_key_exchange(std::string &&s) {
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
+        return alert(2, 10);
     }
+    accumulate(s);
+    const auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
+    // Extract server's ephemeral public key from received message.
+    const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
+    // Compute shared key.
+    derive_keys((prv_key_ * Y).x_);
+
+    // Check signature.
+    auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + RSA_SIG_SIZE));
+    unsigned char check_sig[RSA_SIG_SIZE];
+    mpz2bnd(z, check_sig, check_sig + RSA_SIG_SIZE);
+    unsigned char check_hash[MESSAGE_TO_HASH_SIZE];
+    std::copy(client_random_.cbegin(), client_random_.cend(), check_hash);
+    std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + RANDOM_SIZE);
+    std::copy_n(&p->named_curve, PUBKEY_SIZE, check_hash + RANDOM_SIZE * 2);
+
+    SHA256 sha;
+    auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
+
+    if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
+        spdlog::error("server_key_exchange:client: Check signature - fail");
+        return alert(2, 51); // decrypt error
+    }
+
+    spdlog::info("server_key_exchange:client: Check signature - success");
+    return "";
 }
 
-template<bool SV>
-std::string TLS<SV>::server_hello_done(std::string &&s) {
-    if constexpr (SV) {
-        // server
-        constexpr server_hello_done_message msg;
-        return accumulate(struct2str(msg));
-    } else {
-        // client
-        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
-            return alert(2, 10);
-        }
-        accumulate(s);
-        return "";
-    }
+template<>
+std::string TLS<SV_SERVER>::server_key_exchange(std::string &&) {
+    server_key_exchange_message msg;
+    msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
+    msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
+    msg.handshake.handshake_type = SERVER_KEY_EXCHANGE;
+    mpz2bnd(P_.x_, msg.x, msg.x + 32);
+    mpz2bnd(P_.y_, msg.y, msg.y + 32);
+    generate_signature(&msg.named_curve, msg.sign);
+    return accumulate(struct2str(msg));
 }
 
-template<bool SV>
-std::string TLS<SV>::client_key_exchange(std::string &&s) {
-    // After this step, messages between server and client are encrypted.
-    if constexpr (SV) {
-        // server
-        if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
-            return alert(2, 10);
-        }
-        accumulate(s);
-        auto p = reinterpret_cast<client_key_exchange_message *>(s.data());
-        const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
-        // Compute shared key.
-        derive_keys((prv_key_ * Y).x_);
-        return "";
-    } else {
-        // client
-        client_key_exchange_message msg;
-        msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
-        msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-        // Fill with client's public key coordinates.
-        mpz2bnd(P_.x_, msg.x, msg.x + 32);
-        mpz2bnd(P_.y_, msg.y, msg.y + 32);
-        return accumulate(struct2str(msg));
+template<>
+std::string TLS<SV_CLIENT>::server_hello_done(std::string &&s) {
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
+        return alert(2, 10);
     }
+    accumulate(s);
+    return "";
+}
+
+template<>
+std::string TLS<SV_SERVER>::server_hello_done(std::string &&) {
+    constexpr server_hello_done_message msg;
+    return accumulate(struct2str(msg));
+}
+
+template<>
+std::string TLS<SV_CLIENT>::client_key_exchange(std::string &&) {
+    // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
+    client_key_exchange_message msg;
+    msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
+    msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
+    // Fill with client's public key coordinates.
+    mpz2bnd(P_.x_, msg.x, msg.x + 32);
+    mpz2bnd(P_.y_, msg.y, msg.y + 32);
+    return accumulate(struct2str(msg));
+}
+
+template<>
+std::string TLS<SV_SERVER>::client_key_exchange(std::string &&s) {
+    // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
+        return alert(2, 10);
+    }
+    accumulate(s);
+    auto p = reinterpret_cast<client_key_exchange_message *>(s.data());
+    const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
+    // Compute shared key.
+    derive_keys((prv_key_ * Y).x_);
+    return "";
 }
 
 template<bool SV>

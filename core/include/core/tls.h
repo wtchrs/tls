@@ -12,8 +12,9 @@
 #include "core/mpz.h"
 #include "core/rsa.h"
 
-constexpr bool TLS_SERVER = true;
-constexpr bool TLS_CLIENT = false;
+#define SV_SERVER true
+#define SV_CLIENT false
+
 
 /**
  * @brief A template class implementing the TLS protocol.
@@ -26,7 +27,7 @@ constexpr bool TLS_CLIENT = false;
  *
  * @tparam SV Boolean indicating server mode (true) or client mode (false)
  */
-template<bool SV = true>
+template<bool SV>
 class TLS {
 protected:
     GCM<AES128> aes_[2] = {}; ///< GCM mode AES-128 cipher
@@ -34,14 +35,15 @@ protected:
 
     /** secp256r1 elliptic curve parameters */
     ECField secp256r1_{
-            mpz_class{"0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC"},
-            mpz_class{"0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B"},
-            mpz_class{"0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF"}
+        mpz_class{"0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC"},
+        mpz_class{"0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B"},
+        mpz_class{"0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF"}
     };
     /** Generator point for the secp256r1 curve */
     ECPoint G_{
-            mpz_class{"0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296"},
-            mpz_class{"0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5"}, secp256r1_
+        mpz_class{"0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296"},
+        mpz_class{"0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5"},
+        secp256r1_
     };
 
     mpz_class prv_key_ = random_prime(31); ///< Private key for the curve

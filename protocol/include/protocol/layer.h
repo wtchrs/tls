@@ -9,9 +9,6 @@
 
 #define BUF_SIZE 4096
 
-#define SV_SERVER true
-#define SV_CLIENT false
-
 
 class Layer {
 public:
