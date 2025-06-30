@@ -8,8 +8,15 @@ certbot/
 
 # LSP and IDE
 .cache/
-compile_commands.json
 .vscode/
+.clangd
+compile_commands.json
+
+# CMake
+cmake-build-debug/
 
 # CTest results
 Testing/
+
+# VCPKG Overlay Ports
+overlays/

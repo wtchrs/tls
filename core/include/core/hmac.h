@@ -58,7 +58,15 @@ public:
      * @return The HMAC as an array of bytes.
      */
     template<typename It>
-    auto hash(It begin, It end);
+    std::array<unsigned char, Hash::output_size> hash(It begin, It end);
+
+    /**
+     * @brief Returns the pointer of the hash object.
+     * @return The pointer of the hash object.
+     */
+    Hash *get_hash_obj() const {
+        return &hash_;
+    }
 };
 
 template<HashFunction Hash>
@@ -83,7 +91,7 @@ void HMAC<Hash>::key(const It begin, const It end) {
 
 template<HashFunction Hash>
 template<typename It>
-auto HMAC<Hash>::hash(It begin, It end) {
+std::array<unsigned char, Hash::output_size> HMAC<Hash>::hash(It begin, It end) {
     // Append the message to the inner key pad and hash it
     std::vector<unsigned char> v{i_key_pad_.begin(), i_key_pad_.end()};
     v.insert(v.end(), begin, end);

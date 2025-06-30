@@ -7,6 +7,7 @@ file(GLOB_RECURSE TEST_SOURCES
         cipher_mode.cpp
         diffie_hellman.cpp
         ecdsa.cpp
+        hkdf.cpp
         hmac.cpp
         mpz.cpp
         prf.cpp
