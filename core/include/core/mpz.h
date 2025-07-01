@@ -2,8 +2,11 @@
 #define MPZ_H
 
 
+#include <algorithm>
+#include <gmp.h>
 #include <gmpxx.h>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 
 
@@ -42,9 +45,22 @@ mpz_class random_prime(unsigned b);
  */
 template<typename It>
 void mpz2bnd(mpz_class n, It begin, It end) {
-    for (It i = end; i != begin; n /= 0x100) {
-        *--i = mpz_class{n % 0x100}.get_ui();
+    size_t buffer_size_in_bytes = std::distance(begin, end);
+    if (buffer_size_in_bytes == 0) {
+        return;
     }
+    auto num_bytes_n = mpz_sizeinbase(n.get_mpz_t(), 256);
+    auto bytes_to_write = std::min(buffer_size_in_bytes, num_bytes_n);
+
+    std::fill(begin, end, 0);
+
+    // Calculate offset for right-alignment.
+    if (bytes_to_write < buffer_size_in_bytes) {
+        std::advance(begin, buffer_size_in_bytes - bytes_to_write);
+    }
+
+    size_t count = 0;
+    mpz_export(&(*begin), &count, 1, sizeof(unsigned char), 1, 0, n.get_mpz_t());
 }
 
 /**

@@ -1,4 +1,5 @@
 file(GLOB_RECURSE SOURCES
+        src/sha/operations.cpp
         src/aes.cpp
         src/base64.cpp
         src/cert.cpp

@@ -74,7 +74,7 @@ template<typename It>
 void HMAC<Hash>::key(const It begin, const It end) {
     std::array<unsigned char, Hash::block_size> key{}; // Zero-padded key
     // Hash the key if it is longer than the block size
-    if (end - begin > Hash::block_size) {
+    if (static_cast<size_t>(end - begin) > Hash::block_size) {
         auto h = hash_.hash(begin, end);
         std::copy(h.begin(), h.end(), key.begin());
     } else {
