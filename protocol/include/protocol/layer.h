@@ -5,7 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include "core/tls.h"
+#include "core/tls12.h"
 
 #define BUF_SIZE 4096
 
@@ -59,7 +59,7 @@ protected:
 template<bool SV>
 class BaseTLSLayer : public VRecv {
 protected:
-    TLS<SV> tls{};
+    TLS12<SV> tls{};
 
 public:
     BaseTLSLayer(std::unique_ptr<Layer> lower);

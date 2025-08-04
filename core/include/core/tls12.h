@@ -1,5 +1,7 @@
-#ifndef TLS_H
-#define TLS_H
+/** TLS 1.2 */
+
+#ifndef CORE_TLS12_H
+#define CORE_TLS12_H
 
 
 #include <cstdint>
@@ -28,7 +30,7 @@
  * @tparam SV Boolean indicating server mode (true) or client mode (false)
  */
 template<bool SV>
-class TLS {
+class TLS12 {
 protected:
     GCM<AES128> aes_[2] = {}; ///< GCM mode AES-128 cipher
     mpz_class enc_seq_num_ = 0, dec_seq_num_ = 0; ///< Sequence number for encryption and decryption

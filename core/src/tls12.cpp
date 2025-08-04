@@ -1,4 +1,4 @@
-#include "core/tls.h"
+#include "core/tls12.h"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -21,6 +21,7 @@
 #include "core/prf.h"
 #include "core/rsa.h"
 #include "core/sha/sha2.h"
+#include "core/utils.h"
 
 constexpr size_t RANDOM_SIZE = 32; // Size of client random and server random
 constexpr size_t PUBKEY_SIZE = 69;
@@ -56,10 +57,10 @@ RSA init_rsa() {
 }
 
 template<bool SV>
-std::string TLS<SV>::certificate_ = init_certificate();
+std::string TLS12<SV>::certificate_ = init_certificate();
 
 template<bool SV>
-RSA TLS<SV>::rsa_ = init_rsa();
+RSA TLS12<SV>::rsa_ = init_rsa();
 
 // Pack structs to 1 byte alignment to avoid padding
 #pragma pack(push, 1)
@@ -239,19 +240,14 @@ struct alert_message {
 
 #pragma pack(pop)
 
-template<typename T>
-static std::string struct2str(const T &t) {
-    return std::string{reinterpret_cast<const char *>(&t), sizeof(t)};
-}
-
 template<bool SV>
-std::pair<int, int> TLS<SV>::get_content_type(const std::string &s) {
+std::pair<int, int> TLS12<SV>::get_content_type(const std::string &s) {
     auto p = reinterpret_cast<const uint8_t *>(s.data());
     return {p[0], p[5]};
 }
 
 template<bool SV>
-std::optional<std::string> TLS<SV>::decode(std::string &&s) {
+std::optional<std::string> TLS12<SV>::decode(std::string &&s) {
     const auto p = reinterpret_cast<received_message *>(s.data());
     auth_tag_data tag_data;
     if (const int type = get_content_type(s).first; type != HANDSHAKE && type != APPLICATION_DATA) {
@@ -275,7 +271,7 @@ std::optional<std::string> TLS<SV>::decode(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS<SV>::encode(std::string &&s, const int type) {
+std::string TLS12<SV>::encode(std::string &&s, const int type) {
     // GCM-based encoding
     send_message_header header;
     auth_tag_data tag_data;
@@ -308,7 +304,7 @@ std::string TLS<SV>::encode(std::string &&s, const int type) {
 // ========== TLS<SV> CLASS METHOD IMPLEMENTATIONS ==========
 
 template<>
-std::string TLS<SV_CLIENT>::client_hello(std::string &&) {
+std::string TLS12<SV_CLIENT>::client_hello(std::string &&) {
     client_hello_message msg;
     msg.tls.set_length(sizeof(msg) - sizeof(msg.tls));
     msg.handshake.set_length(sizeof(msg) - sizeof(msg.tls) - sizeof(msg.handshake));
@@ -318,7 +314,7 @@ std::string TLS<SV_CLIENT>::client_hello(std::string &&) {
 }
 
 template<>
-std::string TLS<SV_SERVER>::client_hello(std::string &&s) {
+std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
         return alert(2, 10);
     }
@@ -338,7 +334,7 @@ std::string TLS<SV_SERVER>::client_hello(std::string &&s) {
 }
 
 template<>
-std::string TLS<SV_CLIENT>::server_hello(std::string &&s) {
+std::string TLS12<SV_CLIENT>::server_hello(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
         return alert(2, 10);
     }
@@ -355,7 +351,7 @@ std::string TLS<SV_CLIENT>::server_hello(std::string &&s) {
 }
 
 template<>
-std::string TLS<SV_SERVER>::server_hello(std::string &&) {
+std::string TLS12<SV_SERVER>::server_hello(std::string &&) {
     server_hello_message msg;
     mpz2bnd(random_prime(32), server_random_.begin(), server_random_.end());
     mpz2bnd(random_prime(32), session_id_.begin(), session_id_.end());
@@ -365,7 +361,7 @@ std::string TLS<SV_SERVER>::server_hello(std::string &&) {
 }
 
 template<>
-std::string TLS<SV_CLIENT>::server_certificate(std::string &&s) {
+std::string TLS12<SV_CLIENT>::server_certificate(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CERTIFICATE}) {
         return alert(2, 10);
     }
@@ -391,12 +387,12 @@ std::string TLS<SV_CLIENT>::server_certificate(std::string &&s) {
 }
 
 template<>
-std::string TLS<SV_SERVER>::server_certificate(std::string &&) {
+std::string TLS12<SV_SERVER>::server_certificate(std::string &&) {
     return accumulate(certificate_);
 }
 
 template<bool SV>
-void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) const {
+void TLS12<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) const {
     // Prepare the data to be signed.
     unsigned char message_to_hash[MESSAGE_TO_HASH_SIZE]; // server random + client random + public key
     std::copy(client_random_.cbegin(), client_random_.cend(), message_to_hash);
@@ -432,7 +428,7 @@ void TLS<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) co
 }
 
 template<bool SV>
-void TLS<SV>::derive_keys(const mpz_class &premaster_secret) {
+void TLS12<SV>::derive_keys(const mpz_class &premaster_secret) {
     unsigned char pre[32], rand[64];
     mpz2bnd(premaster_secret, pre, pre + 32);
     PRF<SHA256> prf;
@@ -455,7 +451,7 @@ void TLS<SV>::derive_keys(const mpz_class &premaster_secret) {
 }
 
 template<>
-std::string TLS<SV_CLIENT>::server_key_exchange(std::string &&s) {
+std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
         return alert(2, 10);
     }
@@ -492,7 +488,7 @@ std::string TLS<SV_CLIENT>::server_key_exchange(std::string &&s) {
 }
 
 template<>
-std::string TLS<SV_SERVER>::server_key_exchange(std::string &&) {
+std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
     server_key_exchange_message msg;
     msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
     msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
@@ -504,7 +500,7 @@ std::string TLS<SV_SERVER>::server_key_exchange(std::string &&) {
 }
 
 template<>
-std::string TLS<SV_CLIENT>::server_hello_done(std::string &&s) {
+std::string TLS12<SV_CLIENT>::server_hello_done(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
         return alert(2, 10);
     }
@@ -513,13 +509,13 @@ std::string TLS<SV_CLIENT>::server_hello_done(std::string &&s) {
 }
 
 template<>
-std::string TLS<SV_SERVER>::server_hello_done(std::string &&) {
+std::string TLS12<SV_SERVER>::server_hello_done(std::string &&) {
     constexpr server_hello_done_message msg;
     return accumulate(struct2str(msg));
 }
 
 template<>
-std::string TLS<SV_CLIENT>::client_key_exchange(std::string &&) {
+std::string TLS12<SV_CLIENT>::client_key_exchange(std::string &&) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
     client_key_exchange_message msg;
     msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
@@ -531,7 +527,7 @@ std::string TLS<SV_CLIENT>::client_key_exchange(std::string &&) {
 }
 
 template<>
-std::string TLS<SV_SERVER>::client_key_exchange(std::string &&s) {
+std::string TLS12<SV_SERVER>::client_key_exchange(std::string &&s) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
         return alert(2, 10);
@@ -545,7 +541,7 @@ std::string TLS<SV_SERVER>::client_key_exchange(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS<SV>::change_cipher_spec(std::string &&s) {
+std::string TLS12<SV>::change_cipher_spec(std::string &&s) {
     if (s.empty()) {
         // send CHANGE_CIPHER_SPEC message
         change_cipher_spec_message msg;
@@ -560,7 +556,7 @@ std::string TLS<SV>::change_cipher_spec(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS<SV>::finished(std::string &&s) {
+std::string TLS12<SV>::finished(std::string &&s) {
     PRF<SHA256> prf;
     SHA256 sha;
     prf.secret(master_secret_.cbegin(), master_secret_.cend());
@@ -598,13 +594,13 @@ std::string TLS<SV>::finished(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS<SV>::alert(const uint8_t level, const uint8_t desc) {
+std::string TLS12<SV>::alert(const uint8_t level, const uint8_t desc) {
     const alert_message h{level, desc};
     return struct2str(h);
 }
 
 template<bool SV>
-int TLS<SV>::alert(std::string &&s) {
+int TLS12<SV>::alert(std::string &&s) {
     const auto *p = reinterpret_cast<alert_message *>(s.data());
     int level, desc;
 
@@ -657,11 +653,11 @@ int TLS<SV>::alert(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS<SV>::accumulate(const std::string &s) {
+std::string TLS12<SV>::accumulate(const std::string &s) {
     accumulated_handshakes_ += s.substr(sizeof(TLS_header));
     return s;
 }
 
 // Explicit template instantiation
-template class TLS<true>;
-template class TLS<false>;
+template class TLS12<true>;
+template class TLS12<false>;

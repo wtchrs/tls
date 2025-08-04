@@ -9,7 +9,7 @@ file(GLOB_RECURSE SOURCES
         src/mpz.cpp
         src/rsa.cpp
         src/sha1.cpp
-        src/tls.cpp
+        src/tls12.cpp
 )
 
 add_library(core STATIC ${SOURCES})

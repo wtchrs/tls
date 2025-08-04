@@ -13,7 +13,7 @@ file(GLOB_RECURSE TEST_SOURCES
         prf.cpp
         rsa.cpp
         sha.cpp
-        tls.cpp
+        tls12.cpp
         test_config.cpp
 )
 

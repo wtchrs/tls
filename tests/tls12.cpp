@@ -1,4 +1,4 @@
-#include "core/tls.h"
+#include "core/tls12.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <spdlog/spdlog.h>
@@ -15,7 +15,7 @@ public:
 };
 
 template<bool SV>
-class TLSTest : public TLS<SV> {
+class TLSTest : public TLS12<SV> {
 public:
     // Access to protected members through inheritance
     [[nodiscard]]
@@ -158,11 +158,13 @@ TEST_CASE("Test TLS without other layer") {
 
     for (int i = 0; i < 2; i++) {
         INFO("Server and client's " << i << "th schedule values are not equal.");
-        REQUIRE(std::equal(
-            AES128Test::get_schedule(((const GCMTest &) (server.get_aes(i))).get_cipher()),
-            AES128Test::get_schedule(((const GCMTest &) (server.get_aes(i))).get_cipher()) + 11 * 16,
-            AES128Test::get_schedule(((const GCMTest &) (client.get_aes(i))).get_cipher())
-        ));
+        REQUIRE(
+            std::equal(
+                AES128Test::get_schedule(((const GCMTest &) (server.get_aes(i))).get_cipher()),
+                AES128Test::get_schedule(((const GCMTest &) (server.get_aes(i))).get_cipher()) + 11 * 16,
+                AES128Test::get_schedule(((const GCMTest &) (client.get_aes(i))).get_cipher())
+            )
+        );
     }
 
     // ========== Client send message ==========
