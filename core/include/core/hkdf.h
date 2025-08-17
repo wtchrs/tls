@@ -22,6 +22,8 @@ public:
 
 private:
     std::vector<uint8_t> expand_label(std::string label, std::string context, size_t L);
+
+    Hash *get_hash_obj() const;
 };
 
 template<HashFunction Hash>
@@ -74,6 +76,11 @@ std::vector<uint8_t> HKDF<Hash>::expand_label(std::string label, std::string con
     hkdf_label[2] = label.size() + 6;
     hkdf_label[9 + label.size()] = context.size();
     return expand(hkdf_label, L);
+}
+
+template<HashFunction Hash>
+Hash *HKDF<Hash>::get_hash_obj() const {
+    return hmac_.get_hash_obj();
 }
 
 

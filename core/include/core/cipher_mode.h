@@ -137,6 +137,17 @@ public:
     void set_iv(const unsigned char *p, int offset, size_t len);
 
     /**
+     * @brief Generates the TLS 1.3 per-record nonce by XORing.
+     *
+     * The calculation is performed in-place, updating the internal IV state with
+     * the resulting nonce. This prepares the cipher object for the subsequent
+     * encryption or decryption operation.
+     *
+     * @param p Pointer to the 8-byte record sequence number.
+     */
+    void xor_with_iv(const unsigned char *p);
+
+    /**
      * @brief Sets the additional authenticated data (AAD) for GCM mode.
      *
      * This function is used to set the additional authenticated data (AAD) for GCM mode.
@@ -196,14 +207,22 @@ private:
 
 template<CIPHER Cipher>
 void GCM<Cipher>::set_iv(const unsigned char *p) {
-    // std::copy(p, p + 12, this->iv);
     std::copy_n(p, 12, this->iv_);
 }
 
 template<CIPHER Cipher>
 void GCM<Cipher>::set_iv(const unsigned char *p, int offset, const size_t len) {
-    // std::copy(p, p + len, this->iv + offset);
     std::copy_n(p, len, this->iv_ + offset);
+}
+
+template<CIPHER Cipher>
+void GCM<Cipher>::xor_with_iv(const unsigned char *p) {
+    for (size_t i = 0; i < 4; ++i) {
+        this->iv_[i] ^= 0;
+    }
+    for (size_t i = 0; i < 8; ++i) {
+        this->iv_[i + 4] ^= p[i];
+    }
 }
 
 template<CIPHER Cipher>
