@@ -141,7 +141,8 @@ bool TLS13<SV_SERVER>::handshake(
     if (shared_secret_) {
         // TLS 1.3
         protect_handshake();
-        s += this->change_cipher_spec();
+        s += this->change_cipher_spec(); // not necessary. dummy record for compatibility.
+        // Switched to Handshake Traffic Keys.
         std::string t = encrypted_extention();
         t += server_certificate13();
         t += certificate_verify();
@@ -161,6 +162,7 @@ bool TLS13<SV_SERVER>::handshake(
             (s = finished(std::move(*a))) != "") {
             goto error;
         }
+        // Handshake finished. Switched to Application Traffic Keys.
     } else {
         // TLS 1.2
         s += this->server_certificate();
@@ -226,14 +228,18 @@ bool TLS13<SV_CLIENT>::handshake(
         if (!a || !(a = this->decode(std::move(*a)))) {
             goto error;
         }
+        // TODO: Why does not check received message?
+
+        // Switched to Handshake Traffic Keys.
 
         this->accumulated_handshakes_ += *a;
         std::string temp = this->accumulated_handshakes_;
-        s = this->change_cipher_spec();
+        s = this->change_cipher_spec(); // not necessary. dummy record for compatibility.
         s += this->encode(finished());
         write_f(std::move(s));
         this->accumulated_handshakes_ = temp;
         protect_data();
+        // Handshake finished. Switched to Application Traffic Keys.
     } else {
         // TLS 1.2
         s = this->alert(2, 0);

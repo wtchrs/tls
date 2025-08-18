@@ -8,21 +8,74 @@
 #include <vector>
 #include "core/hmac.h"
 
+/**
+ * @brief A class implementing the HMAC-based Key Derivation Function (HKDF).
+ *
+ * @tparam Hash The hash function to be used, which must conform to the {@ref HashFunction} interface.
+ * @see HMAC
+ */
 template<HashFunction Hash>
 class HKDF {
 private:
-    HMAC<Hash> hmac_;
+    HMAC<Hash> hmac_; ///< Internal HMAC instance used for key derivation.
 
 public:
+    /**
+     * @brief Resets the salt to a zeroed value.
+     *
+     * This method sets the salt to an array of zeros with a size equal to the hash function's output size.
+     */
     void zero_salt();
+
+    /**
+     * @brief Sets the salt value for the HKDF.
+     *
+     * @param p Pointer to the salt data.
+     * @param sz Size of the salt data in bytes.
+     */
     void salt(uint8_t *p, size_t sz);
+
+    /**
+     * @brief Extracts a pseudorandom key from the input keying material.
+     *
+     * @param p Pointer to the input keying material.
+     * @param sz Size of the input keying material in bytes.
+     * @return A vector containing the extracted pseudorandom key.
+     */
     std::vector<uint8_t> extract(uint8_t *p, size_t sz);
+
+    /**
+     * @brief Derives a secret using a label and a message.
+     *
+     * @param label A string label used in the derivation process.
+     * @param msg A string message used in the derivation process.
+     * @return A vector containing the derived secret.
+     */
     std::vector<uint8_t> derive_secret(std::string label, std::string msg);
+
+    /**
+     * @brief Expands a pseudorandom key into output keying material.
+     *
+     * @param info A string containing context and application-specific information.
+     * @param L The desired length of the output keying material in bytes.
+     * @return A vector containing the expanded keying material.
+     */
     std::vector<uint8_t> expand(std::string info, size_t L);
 
-private:
+    /**
+     * @brief Expands a pseudorandom key using a labeled context.
+     *
+     * @param label A string label used in the expansion process.
+     * @param context A string context used in the expansion process.
+     * @param L The desired length of the output keying material in bytes.
+     * @return A vector containing the expanded keying material.
+     */
     std::vector<uint8_t> expand_label(std::string label, std::string context, size_t L);
 
+    /**
+     * @brief Returns the pointer of the hash object.
+     * @return The pointer of the hash object.
+     */
     Hash *get_hash_obj() const;
 };
 
