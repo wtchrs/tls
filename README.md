@@ -40,6 +40,34 @@ cmake --build build
 ctest --preset default
 ```
 
+## TLS 1.3 Handshake
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Client->>Server: ClientHello (supported_groups, key_share, supported_versions, psk_key_exchange_modes, signature_algorithms, ...)
+
+    Server->>Client: ServerHello (selected version, key_share)
+
+    Note over Client,Server: Encrypted with Handshake Traffic Keys from ServerHello onwards
+
+    Server-->>Client: EncryptedExtensions
+    Server-->>Client: Certificate
+    Server-->>Client: CertificateVerify
+    Server-->>Client: Finished
+
+    Note over Client: Verify server Finished →  Verify server authentication and handshake integrity
+
+    Client-->>Server: Finished
+
+    Note over Client,Server: Handshake complete, Application Traffic Keys start being used.
+
+    Note over Client,Server: (Optional) ChangeCipherSpec messages may appear for compatibility
+```
+
+
 [book]: https://github.com/AcornPublishing/tls-cryptography
 [certbot]: https://github.com/certbot/certbot
 [certbot-docker]: https://hub.docker.com/r/certbot/certbot
