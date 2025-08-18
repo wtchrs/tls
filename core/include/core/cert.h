@@ -12,7 +12,7 @@
 std::string get_certificate_core(std::istream &is);
 std::optional<Json::Value> pem2json(std::istream &is);
 
-mpz_class str2mpz(std::string &s);
+mpz_class str2mpz(const std::string &s);
 
 std::optional<std::array<mpz_class, 3>> get_pubkeys(std::istream &is);
 std::optional<std::array<mpz_class, 3>> get_pubkeys(Json::Value &value);

@@ -247,12 +247,6 @@ private:
     bool supported_version(unsigned char *p, size_t len);
 
     /**
-     * @brief Derives TLS 1.3 keys from the premaster secret.
-     * @param premaster_secret The premaster secret.
-     */
-    void derive_keys(mpz_class premaster_secret);
-
-    /**
      * @brief Decodes a TLS 1.3 record.
      * @param s The record to decode.
      * @return The decrypted plaintext, or an empty optional on failure.

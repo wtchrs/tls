@@ -47,13 +47,14 @@ static std::string init_certificate() {
 static mpz_class init_prv_key() {
     std::ifstream prv_key_pem{"./cert/example/ec_key.pem"};
     get_certificate_core(prv_key_pem);
-    return *pem2json(prv_key_pem)
-                .transform([](auto json_value) { return json_value[0][1].asString(); })
-                .transform([](auto v) { return str2mpz(v); });
+    return pem2json(prv_key_pem)
+        .transform([](auto json_value) { return json_value[0][1].asString(); })
+        .transform([](auto v) { return str2mpz(v); })
+        .value();
 }
 
 template<bool SV>
-std::string ecdsa_certificate_ = init_certificate();
+std::string TLS13<SV>::ecdsa_certificate_ = init_certificate();
 
 static mpz_class private_key = init_prv_key();
 
@@ -124,7 +125,6 @@ std::string TLS13<SV_CLIENT>::server_hello(std::string &&s) {
 }
 
 
-// TODO: Refactor this function
 template<>
 bool TLS13<SV_SERVER>::handshake(
     std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f
@@ -133,11 +133,6 @@ bool TLS13<SV_SERVER>::handshake(
     std::string s;
     std::optional<std::string> a;
 
-    // s = this->alert(2, 0);
-    // a = read_f();
-    // if (!a || (s = client_hello(std::move(*a))) != "") {
-    //     goto error;
-    // }
     EXPECT_RECEIVE(s, a, client_hello);
 
     s = this->server_hello();
@@ -157,11 +152,6 @@ bool TLS13<SV_SERVER>::handshake(
         s += this->encode(std::move(t), HANDSHAKE);
         write_f(s);
 
-        // s = this->alert(2, 0);
-        // a = read_f();
-        // if (!a || (s = this->change_cipher_spec(std::move(*a))) != "") {
-        //     goto error;
-        // }
         EXPECT_RECEIVE(s, a, this->change_cipher_spec);
 
         s = this->alert(2, 0);
@@ -230,6 +220,12 @@ bool TLS13<SV_CLIENT>::handshake(
 error:
     write_f(s);
     return false;
+}
+
+
+template<bool SV>
+std::string TLS13<SV>::server_certificate13() {
+    return this->accumulate(ecdsa_certificate_).substr(5);
 }
 
 
