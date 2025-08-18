@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 #include "core/hmac.h"
 
@@ -51,7 +52,7 @@ public:
      * @param msg A string message used in the derivation process.
      * @return A vector containing the derived secret.
      */
-    std::vector<uint8_t> derive_secret(std::string label, std::string msg);
+    std::vector<uint8_t> derive_secret(std::string_view label, std::string msg);
 
     /**
      * @brief Expands a pseudorandom key into output keying material.
@@ -70,13 +71,13 @@ public:
      * @param L The desired length of the output keying material in bytes.
      * @return A vector containing the expanded keying material.
      */
-    std::vector<uint8_t> expand_label(std::string label, std::string context, size_t L);
+    std::vector<uint8_t> expand_label(std::string_view label, std::string context, size_t L);
 
     /**
      * @brief Returns the pointer of the hash object.
      * @return The pointer of the hash object.
      */
-    Hash *get_hash_obj() const;
+    Hash *get_hash_obj();
 };
 
 template<HashFunction Hash>
@@ -116,14 +117,14 @@ std::vector<uint8_t> HKDF<Hash>::expand(std::string info, size_t L) {
 }
 
 template<HashFunction Hash>
-std::vector<uint8_t> HKDF<Hash>::derive_secret(std::string label, std::string msg) {
+std::vector<uint8_t> HKDF<Hash>::derive_secret(std::string_view label, std::string msg) {
     auto a = hmac_.get_hash_obj()->hash(msg.begin(), msg.end());
     return expand_label(label, std::string{a.begin(), a.end()}, Hash::output_size);
 }
 
 template<HashFunction Hash>
-std::vector<uint8_t> HKDF<Hash>::expand_label(std::string label, std::string context, size_t L) {
-    std::string hkdf_label = "xxxtls13 " + label + 'x' + context;
+std::vector<uint8_t> HKDF<Hash>::expand_label(std::string_view label, std::string context, size_t L) {
+    std::string hkdf_label = "xxxtls13 " + std::string{label} + 'x' + context;
     hkdf_label[0] = L / 0x100;
     hkdf_label[1] = L % 0x100;
     hkdf_label[2] = label.size() + 6;
@@ -132,7 +133,7 @@ std::vector<uint8_t> HKDF<Hash>::expand_label(std::string label, std::string con
 }
 
 template<HashFunction Hash>
-Hash *HKDF<Hash>::get_hash_obj() const {
+Hash *HKDF<Hash>::get_hash_obj() {
     return hmac_.get_hash_obj();
 }
 

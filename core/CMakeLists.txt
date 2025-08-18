@@ -10,6 +10,7 @@ file(GLOB_RECURSE SOURCES
         src/rsa.cpp
         src/sha1.cpp
         src/tls12.cpp
+        src/tls13.cpp
 )
 
 add_library(core STATIC ${SOURCES})

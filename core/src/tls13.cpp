@@ -6,6 +6,7 @@
 #include <gmpxx.h>
 #include <nettle/curve25519.h>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include "core/base64.h"
@@ -721,7 +722,7 @@ void TLS13<SV>::protect_data() {
 
 template<bool SV>
 std::array<std::vector<uint8_t>, 2>
-TLS13<SV>::set_aes(std::vector<uint8_t> salt, std::string client_label, std::string server_label) {
+TLS13<SV>::set_aes(std::vector<uint8_t> salt, std::string_view client_label, std::string_view server_label) {
     // Reset sequence numbers each time key material is set.
     this->enc_seq_num_ = 0;
     this->dec_seq_num_ = 0;

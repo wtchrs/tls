@@ -8,6 +8,7 @@
 #include <functional>
 #include <gmpxx.h>
 #include <optional>
+#include <string_view>
 #include <vector>
 #include "core/hkdf.h"
 #include "core/sha/sha2.h"
@@ -25,11 +26,11 @@ template<bool SV>
 class TLS13 : public TLS12<SV> {
 public:
     /** @brief Labels for HKDF key derivation in TLS 1.3. */
-    static constexpr std::string INTERMEDIATE_DERIVATION_LABEL = "derived",
-                                 CLIENT_HANDSHAKE_TRAFFIC_LABEL = "c hs traffic",
-                                 SERVER_HANDSHAKE_TRAFFIC_LABEL = "s hs traffic",
-                                 CLIENT_APPLICATION_TRAFFIC_LABEL = "c ap traffic",
-                                 SERVER_APPLICATION_TRAFFIC_LABEL = "s ap traffic";
+    static constexpr std::string_view INTERMEDIATE_DERIVATION_LABEL = "derived",
+                                      CLIENT_HANDSHAKE_TRAFFIC_LABEL = "c hs traffic",
+                                      SERVER_HANDSHAKE_TRAFFIC_LABEL = "s hs traffic",
+                                      CLIENT_APPLICATION_TRAFFIC_LABEL = "c ap traffic",
+                                      SERVER_APPLICATION_TRAFFIC_LABEL = "s ap traffic";
 
 protected:
     /** @brief HKDF instance with SHA256 for key derivation. */
@@ -201,7 +202,7 @@ private:
      * @return An array containing the client and server finished keys.
      */
     std::array<std::vector<uint8_t>, 2>
-    set_aes(std::vector<uint8_t> salt, std::string client_label, std::string server_label);
+    set_aes(std::vector<uint8_t> salt, std::string_view client_label, std::string_view server_label);
 
     /**
      * @brief Checks if the secp256r1 group is in the supported groups extension.

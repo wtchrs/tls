@@ -64,7 +64,7 @@ public:
      * @brief Returns the pointer of the hash object.
      * @return The pointer of the hash object.
      */
-    Hash *get_hash_obj() const {
+    Hash *get_hash_obj() {
         return &hash_;
     }
 };
