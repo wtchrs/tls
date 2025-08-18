@@ -57,12 +57,12 @@ protected:
 
 
 template<bool SV>
-class BaseTLSLayer : public VRecv {
+class BaseTLS12Layer : public VRecv {
 protected:
     TLS12<SV> tls{};
 
 public:
-    BaseTLSLayer(std::unique_ptr<Layer> lower);
+    BaseTLS12Layer(std::unique_ptr<Layer> lower);
     void send(const std::string &s) override;
     std::optional<std::string> recv() override;
 
@@ -73,19 +73,19 @@ protected:
 };
 
 template<bool SV>
-class TLSLayer;
+class TLS12Layer;
 
 template<>
-class TLSLayer<SV_SERVER> : public BaseTLSLayer<SV_SERVER> {
+class TLS12Layer<SV_SERVER> : public BaseTLS12Layer<SV_SERVER> {
 public:
-    TLSLayer(std::unique_ptr<Layer> lower);
+    TLS12Layer(std::unique_ptr<Layer> lower);
     void handshake() override;
 };
 
 template<>
-class TLSLayer<SV_CLIENT> : public BaseTLSLayer<SV_CLIENT> {
+class TLS12Layer<SV_CLIENT> : public BaseTLS12Layer<SV_CLIENT> {
 public:
-    TLSLayer(std::unique_ptr<Layer> lower);
+    TLS12Layer(std::unique_ptr<Layer> lower);
     void handshake() override;
 };
 

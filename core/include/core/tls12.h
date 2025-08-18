@@ -5,6 +5,7 @@
 
 
 #include <cstdint>
+#include <functional>
 #include <gmpxx.h>
 #include <optional>
 #include <utility>
@@ -87,6 +88,16 @@ public:
      */
     std::string encode(std::string &&s = "", int type = 0x17);
 
+    /**
+     * @brief Performs the TLS 1.2 handshake.
+     * @param read_f A function to read data from the peer.
+     * @param write_f A function to write data to the peer.
+     * @return True if the handshake was successful, false otherwise.
+     */
+    bool handshake(
+        const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
+    );
+
     // ========== FOR HANDSHAKE ==========
 
     // These methods behave differently depending on the SV template parameter.
@@ -117,6 +128,12 @@ public:
 
 protected:
     std::string accumulate(const std::string &s);
+
+    bool handshake_sub(
+        const std::function<std::optional<std::string>()> &read_f,
+        const std::function<void(std::string)> &write_f,
+        std::string waiting_msg
+    );
 
 private:
     void generate_signature(unsigned char *pub_key, unsigned char *sign) const;

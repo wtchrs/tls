@@ -158,7 +158,7 @@ protected:
      * @brief Generates the EncryptedExtensions message.
      * @return The EncryptedExtensions message.
      */
-    std::string encrypted_extention();
+    std::string encrypted_extension();
 
     /**
      * @brief Parses extensions from a received ClientHello message.

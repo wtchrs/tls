@@ -1,5 +1,6 @@
 #include "protocol/layer.h"
 #include <cstdint>
+#include <functional>
 #include <regex>
 
 // class TCPLayer
@@ -64,19 +65,19 @@ size_t HTTPLayer::get_full_length(const std::string &s) {
 }
 
 
-// class BaseTLSLayer<bool>
+// class BaseTLS12Layer<bool>
 
 template<bool SV>
-BaseTLSLayer<SV>::BaseTLSLayer(std::unique_ptr<Layer> lower)
+BaseTLS12Layer<SV>::BaseTLS12Layer(std::unique_ptr<Layer> lower)
     : VRecv{std::move(lower)} {}
 
 template<bool SV>
-void BaseTLSLayer<SV>::send(const std::string &s) {
+void BaseTLS12Layer<SV>::send(const std::string &s) {
     VRecv::send(tls.encode(std::string{s}));
 }
 
 template<bool SV>
-std::optional<std::string> BaseTLSLayer<SV>::recv() {
+std::optional<std::string> BaseTLS12Layer<SV>::recv() {
     if (auto r = VRecv::recv(); r) {
         return tls.decode(std::string{*r});
     }
@@ -84,59 +85,36 @@ std::optional<std::string> BaseTLSLayer<SV>::recv() {
 }
 
 template<bool SV>
-void BaseTLSLayer<SV>::send_without_enc(const std::string &s) {
+void BaseTLS12Layer<SV>::send_without_enc(const std::string &s) {
     VRecv::send(s);
 }
 
 template<bool SV>
-std::optional<std::string> BaseTLSLayer<SV>::recv_without_enc() {
+std::optional<std::string> BaseTLS12Layer<SV>::recv_without_enc() {
     return VRecv::recv();
 }
 
 template<bool SV>
-size_t BaseTLSLayer<SV>::get_full_length(const std::string &s) {
+size_t BaseTLS12Layer<SV>::get_full_length(const std::string &s) {
     return s.size() < 5 ? 0 : static_cast<uint8_t>(s[3]) * 0x100 + static_cast<uint8_t>(s[4]) + 5;
 }
 
 
-// class TLSLayer<SV_SERVER>
+// class TLS12Layer<SV_SERVER>
 
-TLSLayer<SV_SERVER>::TLSLayer(std::unique_ptr<Layer> lower)
-    : BaseTLSLayer{std::move(lower)} {}
+TLS12Layer<SV_SERVER>::TLS12Layer(std::unique_ptr<Layer> lower)
+    : BaseTLS12Layer{std::move(lower)} {}
 
-void TLSLayer<SV_SERVER>::handshake() {
-    // TODO: Add error handling
-    tls.client_hello(*recv_without_enc());
-    auto server_hello = tls.server_hello();
-    auto server_certificate = tls.server_certificate();
-    auto server_key_exchange = tls.server_key_exchange();
-    auto server_hello_done = tls.server_hello_done();
-    send_without_enc(server_hello + server_certificate + server_key_exchange + server_hello_done);
-    tls.client_key_exchange(*recv_without_enc());
-    tls.change_cipher_spec(*recv_without_enc());
-    tls.finished(*recv_without_enc());
-    auto change_cipher_spec = tls.change_cipher_spec();
-    auto finished = tls.finished();
-    send_without_enc(change_cipher_spec + finished);
+void TLS12Layer<SV_SERVER>::handshake() {
+    tls.handshake([&]() { return this->recv_without_enc(); }, [&](auto s) { this->send_without_enc(s); });
 }
 
 
-// class TLSLayer<SV_CLIENT>
+// class TLS12Layer<SV_CLIENT>
 
-TLSLayer<SV_CLIENT>::TLSLayer(std::unique_ptr<Layer> lower)
-    : BaseTLSLayer{std::move(lower)} {}
+TLS12Layer<SV_CLIENT>::TLS12Layer(std::unique_ptr<Layer> lower)
+    : BaseTLS12Layer{std::move(lower)} {}
 
-void TLSLayer<SV_CLIENT>::handshake() {
-    // TODO: Add error handling
-    send_without_enc(tls.client_hello());
-    tls.server_hello(*recv_without_enc());
-    tls.server_certificate(*recv_without_enc());
-    tls.server_key_exchange(*recv_without_enc());
-    tls.server_hello_done(*recv_without_enc());
-    auto client_key_exchange = tls.client_key_exchange();
-    auto change_cipher_spec = tls.change_cipher_spec();
-    auto finished = tls.finished();
-    send_without_enc(client_key_exchange + change_cipher_spec + finished);
-    tls.change_cipher_spec(*recv_without_enc());
-    tls.finished(*recv_without_enc());
+void TLS12Layer<SV_CLIENT>::handshake() {
+    tls.handshake([&]() { return this->recv_without_enc(); }, [&](auto s) { this->send_without_enc(s); });
 }

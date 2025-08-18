@@ -17,6 +17,7 @@
 #include "core/sha/sha2.h"
 #include "core/tls12.h"
 #include "core/tls12_types.h"
+#include "core/tls_macros.h"
 #include "core/utils.h"
 
 
@@ -132,67 +133,50 @@ bool TLS13<SV_SERVER>::handshake(
     std::string s;
     std::optional<std::string> a;
 
-    s = this->alert(2, 0);
-    a = read_f();
-    if (!a || (s = client_hello(std::move(*a))) != "") {
-        goto error;
-    }
+    // s = this->alert(2, 0);
+    // a = read_f();
+    // if (!a || (s = client_hello(std::move(*a))) != "") {
+    //     goto error;
+    // }
+    EXPECT_RECEIVE(s, a, client_hello);
 
     s = this->server_hello();
-    if (shared_secret_) {
+
+    if (!shared_secret_) {
+        // TLS 1.2
+        return TLS12<SV_SERVER>::handshake_sub(read_f, write_f, std::move(s));
+    } else {
         // TLS 1.3
         protect_handshake();
         s += this->change_cipher_spec(); // not necessary. dummy record for compatibility.
         // Switched to Handshake Traffic Keys.
-        std::string t = encrypted_extention();
+        std::string t = encrypted_extension();
         t += server_certificate13();
         t += certificate_verify();
         t += finished();
         s += this->encode(std::move(t), HANDSHAKE);
         write_f(s);
 
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->change_cipher_spec(std::move(*a))) != "") {
-            goto error;
-        }
+        // s = this->alert(2, 0);
+        // a = read_f();
+        // if (!a || (s = this->change_cipher_spec(std::move(*a))) != "") {
+        //     goto error;
+        // }
+        EXPECT_RECEIVE(s, a, this->change_cipher_spec);
 
         s = this->alert(2, 0);
         a = read_f();
-        if (!a || !(a = this->decode(std::move(*a))) || (protect_data(), false) ||
-            (s = finished(std::move(*a))) != "") {
+        if (!a || !(a = this->decode(std::move(*a)))) {
             goto error;
         }
+        protect_data();
+        if ((s = finished(std::move(*a))) != "") {
+            goto error;
+        }
+
         // Handshake finished. Switched to Application Traffic Keys.
-    } else {
-        // TLS 1.2
-        s += this->server_certificate();
-        s += this->server_key_exchange();
-        s += this->server_hello_done();
-        write_f(s);
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->client_key_exchange(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->change_cipher_spec(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = TLS12<SV_SERVER>::finished(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->change_cipher_spec();
-        s += TLS12<SV_SERVER>::finished();
-        write_f(std::move(s));
     }
+
     return true;
 error:
     write_f(s);
@@ -214,15 +198,14 @@ bool TLS13<SV_CLIENT>::handshake(
         goto error;
     }
 
-    if (shared_secret_) {
+    if (!shared_secret_) {
+        // TLS 1.2
+        return TLS12<SV_CLIENT>::handshake_sub(read_f, write_f, "");
+    } else {
         // TLS 1.3
         protect_handshake();
 
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->change_cipher_spec(std::move(*a))) != "") {
-            goto error;
-        }
+        EXPECT_RECEIVE(s, a, this->change_cipher_spec);
 
         s = this->alert(2, 0);
         a = read_f();
@@ -241,42 +224,6 @@ bool TLS13<SV_CLIENT>::handshake(
         this->accumulated_handshakes_ = temp;
         protect_data();
         // Handshake finished. Switched to Application Traffic Keys.
-    } else {
-        // TLS 1.2
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->server_certificate(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->server_key_exchange(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->server_hello_done(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->client_key_exchange();
-        s += this->change_cipher_spec();
-        s += TLS12<SV_CLIENT>::finished();
-        write_f(std::move(s));
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = this->change_cipher_spec(std::move(*a))) != "") {
-            goto error;
-        }
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || (s = TLS12<SV_CLIENT>::finished(std::move(*a))) != "") {
-            goto error;
-        }
     }
 
     return true;
@@ -685,7 +632,7 @@ struct EncryptedExt {
 #pragma pack(pop)
 
 template<bool SV>
-std::string TLS13<SV>::encrypted_extention() {
+std::string TLS13<SV>::encrypted_extension() {
     EncryptedExt ext;
     std::string r = struct2str(ext);
     this->accumulated_handshakes_ += r;

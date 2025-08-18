@@ -1,6 +1,7 @@
 #ifndef CORE_TLS_UTILS_H
 #define CORE_TLS_UTILS_H
 
+
 #define EXPECT_OK(s, stmt) \
     do { \
         if ((s = stmt) != "") goto error; \

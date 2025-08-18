@@ -5,7 +5,7 @@
 
 std::unique_ptr<Layer> https_layer_factory(int fd) {
     auto tcp = std::make_unique<TCPLayer>(fd);
-    auto tls = std::make_unique<TLSLayer<SV_SERVER>>(std::move(tcp));
+    auto tls = std::make_unique<TLS12Layer<SV_SERVER>>(std::move(tcp));
     tls->handshake();
     auto http = std::make_unique<HTTPLayer>(std::move(tls));
     return http;

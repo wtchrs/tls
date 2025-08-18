@@ -11,6 +11,7 @@
 #include <ostream>
 #include <spdlog/spdlog.h>
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 #include "core/base64.h"
@@ -22,6 +23,7 @@
 #include "core/rsa.h"
 #include "core/sha/sha2.h"
 #include "core/tls12_types.h"
+#include "core/tls_macros.h"
 #include "core/utils.h"
 
 std::string init_certificate() {
@@ -409,6 +411,95 @@ std::string TLS12<SV>::finished(std::string &&s) {
 
     // Successes to parse received FINISHED message.
     return "";
+}
+
+template<>
+bool TLS12<SV_SERVER>::handshake_sub(
+    const std::function<std::optional<std::string>()> &read_f,
+    const std::function<void(std::string)> &write_f,
+    std::string waiting_msg
+) {
+    std::string s = waiting_msg;
+    std::optional<std::string> a;
+
+    s += this->server_certificate();
+    s += this->server_key_exchange();
+    s += this->server_hello_done();
+    write_f(s);
+
+    EXPECT_RECEIVE(s, a, client_key_exchange);
+    EXPECT_RECEIVE(s, a, change_cipher_spec);
+    EXPECT_RECEIVE(s, a, finished);
+
+    s = this->change_cipher_spec();
+    s += finished();
+    write_f(std::move(s));
+
+    return true;
+error:
+    write_f(s);
+    return false;
+}
+
+template<>
+bool TLS12<SV_SERVER>::handshake(
+    const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
+) {
+    // server-side
+    std::string s;
+    std::optional<std::string> a;
+
+    EXPECT_RECEIVE(s, a, client_hello);
+
+    s = this->server_hello();
+    return handshake_sub(read_f, write_f, std::move(s));
+error:
+    write_f(s);
+    return false;
+}
+
+template<>
+bool TLS12<SV_CLIENT>::handshake_sub(
+    const std::function<std::optional<std::string>()> &read_f,
+    const std::function<void(std::string)> &write_f,
+    std::string waiting_msg
+) {
+    std::string s = waiting_msg;
+    std::optional<std::string> a;
+
+    EXPECT_RECEIVE(s, a, server_certificate);
+    EXPECT_RECEIVE(s, a, server_key_exchange);
+    EXPECT_RECEIVE(s, a, server_hello_done);
+
+    s = this->client_key_exchange();
+    s += this->change_cipher_spec();
+    s += TLS12<SV_CLIENT>::finished();
+    write_f(std::move(s));
+
+    EXPECT_RECEIVE(s, a, change_cipher_spec);
+    EXPECT_RECEIVE(s, a, finished);
+
+    return true;
+error:
+    write_f(s);
+    return false;
+}
+
+template<>
+bool TLS12<SV_CLIENT>::handshake(
+    const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
+) {
+    // client-side
+    std::string s;
+    std::optional<std::string> a;
+
+    write_f(client_hello());
+    EXPECT_RECEIVE(s, a, server_hello);
+
+    return handshake_sub(read_f, write_f, "");
+error:
+    write_f(s);
+    return false;
 }
 
 template<bool SV>

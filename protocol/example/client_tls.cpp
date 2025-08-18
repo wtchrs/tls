@@ -5,7 +5,7 @@
 
 std::unique_ptr<Layer> https_layer_factory(int fd) {
     auto tcp = std::make_unique<TCPLayer>(fd);
-    auto tls = std::make_unique<TLSLayer<SV_CLIENT>>(std::move(tcp));
+    auto tls = std::make_unique<TLS12Layer<SV_CLIENT>>(std::move(tcp));
     tls->handshake();
     auto http = std::make_unique<HTTPLayer>(std::move(tls));
     return http;
@@ -13,7 +13,7 @@ std::unique_ptr<Layer> https_layer_factory(int fd) {
 
 int main() {
     Connector connector{https_layer_factory};
-    auto conn = connector.connect_to("localhost", "2443");
+    auto conn = connector.connect_to("127.0.0.1", "2443");
     conn->send("GET /");
     spdlog::info("Received: {}", *conn->recv());
 }
