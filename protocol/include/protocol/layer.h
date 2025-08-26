@@ -59,7 +59,7 @@ protected:
 template<bool SV>
 class BaseTLS12Layer : public VRecv {
 protected:
-    TLS12<SV> tls{};
+    TLS12<SV> tls{[&]() { return this->recv_without_enc(); }, [&](auto s) { this->send_without_enc(s); }};
 
 public:
     BaseTLS12Layer(std::unique_ptr<Layer> lower);
@@ -75,17 +75,15 @@ protected:
 template<bool SV>
 class TLS12Layer;
 
-template<>
-class TLS12Layer<SV_SERVER> : public BaseTLS12Layer<SV_SERVER> {
+class TLS12LayerServer : public BaseTLS12Layer<SV_SERVER> {
 public:
-    TLS12Layer(std::unique_ptr<Layer> lower);
+    TLS12LayerServer(std::unique_ptr<Layer> lower);
     void handshake() override;
 };
 
-template<>
-class TLS12Layer<SV_CLIENT> : public BaseTLS12Layer<SV_CLIENT> {
+class TLS12LayerClient : public BaseTLS12Layer<SV_CLIENT> {
 public:
-    TLS12Layer(std::unique_ptr<Layer> lower);
+    TLS12LayerClient(std::unique_ptr<Layer> lower);
     void handshake() override;
 };
 

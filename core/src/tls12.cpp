@@ -67,6 +67,15 @@ std::pair<int, int> TLS12<SV>::get_content_type(const std::string &s) {
 }
 
 template<bool SV>
+size_t TLS12<SV>::get_record_length(const std::string &s) {
+    return s.size() < 5 ? 0 : static_cast<uint8_t>(s[3]) * 0x100 + static_cast<uint8_t>(s[4]) + 5;
+}
+
+template<bool SV>
+TLS12<SV>::TLS12(const Read &read_f, const Write &write_f)
+    : rw{read_f, write_f, TLS12<SV>::get_record_length} {}
+
+template<bool SV>
 std::optional<std::string> TLS12<SV>::decode(std::string &&s) {
     const auto p = reinterpret_cast<received_message *>(s.data());
     auth_tag_data tag_data;
@@ -414,18 +423,14 @@ std::string TLS12<SV>::finished(std::string &&s) {
 }
 
 template<>
-bool TLS12<SV_SERVER>::handshake_sub(
-    const std::function<std::optional<std::string>()> &read_f,
-    const std::function<void(std::string)> &write_f,
-    std::string waiting_msg
-) {
+bool TLS12<SV_SERVER>::handshake_sub(std::string waiting_msg) {
     std::string s = waiting_msg;
     std::optional<std::string> a;
 
     s += this->server_certificate();
     s += this->server_key_exchange();
     s += this->server_hello_done();
-    write_f(s);
+    rw.write(s);
 
     EXPECT_RECEIVE(s, a, client_key_exchange);
     EXPECT_RECEIVE(s, a, change_cipher_spec);
@@ -433,18 +438,16 @@ bool TLS12<SV_SERVER>::handshake_sub(
 
     s = this->change_cipher_spec();
     s += finished();
-    write_f(std::move(s));
+    rw.write(std::move(s));
 
     return true;
 error:
-    write_f(s);
+    rw.write(s);
     return false;
 }
 
 template<>
-bool TLS12<SV_SERVER>::handshake(
-    const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
-) {
+bool TLS12<SV_SERVER>::handshake() {
     // server-side
     std::string s;
     std::optional<std::string> a;
@@ -452,18 +455,14 @@ bool TLS12<SV_SERVER>::handshake(
     EXPECT_RECEIVE(s, a, client_hello);
 
     s = this->server_hello();
-    return handshake_sub(read_f, write_f, std::move(s));
+    return handshake_sub(std::move(s));
 error:
-    write_f(s);
+    rw.write(s);
     return false;
 }
 
 template<>
-bool TLS12<SV_CLIENT>::handshake_sub(
-    const std::function<std::optional<std::string>()> &read_f,
-    const std::function<void(std::string)> &write_f,
-    std::string waiting_msg
-) {
+bool TLS12<SV_CLIENT>::handshake_sub(std::string waiting_msg) {
     std::string s = waiting_msg;
     std::optional<std::string> a;
 
@@ -474,31 +473,29 @@ bool TLS12<SV_CLIENT>::handshake_sub(
     s = this->client_key_exchange();
     s += this->change_cipher_spec();
     s += TLS12<SV_CLIENT>::finished();
-    write_f(std::move(s));
+    rw.write(std::move(s));
 
     EXPECT_RECEIVE(s, a, change_cipher_spec);
     EXPECT_RECEIVE(s, a, finished);
 
     return true;
 error:
-    write_f(s);
+    rw.write(s);
     return false;
 }
 
 template<>
-bool TLS12<SV_CLIENT>::handshake(
-    const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
-) {
+bool TLS12<SV_CLIENT>::handshake() {
     // client-side
     std::string s;
     std::optional<std::string> a;
 
-    write_f(client_hello());
+    rw.write(client_hello());
     EXPECT_RECEIVE(s, a, server_hello);
 
-    return handshake_sub(read_f, write_f, "");
+    return handshake_sub("");
 error:
-    write_f(s);
+    rw.write(s);
     return false;
 }
 

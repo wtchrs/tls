@@ -59,6 +59,11 @@ std::string TLS13<SV>::ecdsa_certificate_ = init_certificate();
 static mpz_class private_key = init_prv_key();
 
 
+template<bool SV>
+TLS13<SV>::TLS13(const Read &read_f, const Write &write_f)
+    : TLS12<SV>{read_f, write_f} {}
+
+
 template<>
 std::string TLS13<SV_SERVER>::client_hello(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
@@ -126,9 +131,7 @@ std::string TLS13<SV_CLIENT>::server_hello(std::string &&s) {
 
 
 template<>
-bool TLS13<SV_SERVER>::handshake(
-    std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f
-) {
+bool TLS13<SV_SERVER>::handshake() {
     // server-side
     std::string s;
     std::optional<std::string> a;
@@ -139,7 +142,7 @@ bool TLS13<SV_SERVER>::handshake(
 
     if (!shared_secret_) {
         // TLS 1.2
-        return TLS12<SV_SERVER>::handshake_sub(read_f, write_f, std::move(s));
+        return TLS12<SV_SERVER>::handshake_sub(std::move(s));
     } else {
         // TLS 1.3
         protect_handshake();
@@ -150,12 +153,12 @@ bool TLS13<SV_SERVER>::handshake(
         t += certificate_verify();
         t += finished();
         s += this->encode(std::move(t), HANDSHAKE);
-        write_f(s);
+        this->rw.write(s);
 
         EXPECT_RECEIVE(s, a, this->change_cipher_spec);
 
         s = this->alert(2, 0);
-        a = read_f();
+        a = this->rw.read();
         if (!a || !(a = this->decode(std::move(*a)))) {
             goto error;
         }
@@ -169,28 +172,26 @@ bool TLS13<SV_SERVER>::handshake(
 
     return true;
 error:
-    write_f(s);
+    this->rw.write(s);
     return false;
 }
 
 template<>
-bool TLS13<SV_CLIENT>::handshake(
-    std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f
-) {
+bool TLS13<SV_CLIENT>::handshake() {
     // client-side
     std::string s;
     std::optional<std::string> a;
 
-    write_f(client_hello());
+    this->rw.write(client_hello());
 
-    a = read_f();
+    a = this->rw.read();
     if (!a || (s = server_hello(std::move(*a))) != "") {
         goto error;
     }
 
     if (!shared_secret_) {
         // TLS 1.2
-        return TLS12<SV_CLIENT>::handshake_sub(read_f, write_f, "");
+        return TLS12<SV_CLIENT>::handshake_sub("");
     } else {
         // TLS 1.3
         protect_handshake();
@@ -198,7 +199,7 @@ bool TLS13<SV_CLIENT>::handshake(
         EXPECT_RECEIVE(s, a, this->change_cipher_spec);
 
         s = this->alert(2, 0);
-        a = read_f();
+        a = this->rw.read();
         if (!a || !(a = this->decode(std::move(*a)))) {
             goto error;
         }
@@ -210,7 +211,7 @@ bool TLS13<SV_CLIENT>::handshake(
         std::string temp = this->accumulated_handshakes_;
         s = this->change_cipher_spec(); // not necessary. dummy record for compatibility.
         s += this->encode(finished());
-        write_f(std::move(s));
+        this->rw.write(std::move(s));
         this->accumulated_handshakes_ = temp;
         protect_data();
         // Handshake finished. Switched to Application Traffic Keys.
@@ -218,7 +219,7 @@ bool TLS13<SV_CLIENT>::handshake(
 
     return true;
 error:
-    write_f(s);
+    this->rw.write(s);
     return false;
 }
 

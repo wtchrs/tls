@@ -102,19 +102,19 @@ size_t BaseTLS12Layer<SV>::get_full_length(const std::string &s) {
 
 // class TLS12Layer<SV_SERVER>
 
-TLS12Layer<SV_SERVER>::TLS12Layer(std::unique_ptr<Layer> lower)
+TLS12LayerServer::TLS12LayerServer(std::unique_ptr<Layer> lower)
     : BaseTLS12Layer{std::move(lower)} {}
 
-void TLS12Layer<SV_SERVER>::handshake() {
-    tls.handshake([&]() { return this->recv_without_enc(); }, [&](auto s) { this->send_without_enc(s); });
+void TLS12LayerServer::handshake() {
+    tls.handshake();
 }
 
 
 // class TLS12Layer<SV_CLIENT>
 
-TLS12Layer<SV_CLIENT>::TLS12Layer(std::unique_ptr<Layer> lower)
+TLS12LayerClient::TLS12LayerClient(std::unique_ptr<Layer> lower)
     : BaseTLS12Layer{std::move(lower)} {}
 
-void TLS12Layer<SV_CLIENT>::handshake() {
-    tls.handshake([&]() { return this->recv_without_enc(); }, [&](auto s) { this->send_without_enc(s); });
+void TLS12LayerClient::handshake() {
+    tls.handshake();
 }

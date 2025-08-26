@@ -10,7 +10,7 @@
 #define EXPECT_RECEIVE(s, a, handler) \
     do { \
         s = this->alert(2, 0); \
-        a = read_f(); \
+        a = rw.read(); \
         if (!a || (s = handler(std::move(*a))) != "") goto error; \
     } while (0)
 

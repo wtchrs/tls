@@ -5,7 +5,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <gmpxx.h>
 #include <optional>
 #include <string_view>
@@ -53,17 +52,17 @@ private:
     std::array<std::vector<uint8_t>, 2> finished_key_;
 
 public:
+    TLS13(const Read &read_f, const Write &write_f);
+
     /**
      * @brief Performs the TLS 1.3 handshake.
      *
      * This method orchestrates the handshake process for both client and server,
      * handling the exchange of messages to establish a secure session.
      *
-     * @param read_f A function to read data from the peer.
-     * @param write_f A function to write data to the peer.
      * @return True if the handshake was successful, false otherwise.
      */
-    bool handshake(std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f);
+    bool handshake();
 
     /**
      * @brief Handles or generates a ClientHello message.
