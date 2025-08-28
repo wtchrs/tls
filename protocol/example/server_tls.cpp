@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 #include "protocol/acceptor.h"
 #include "protocol/layer.h"
+#include "protocol/tls12_layer.h"
 
 std::unique_ptr<Layer> https_layer_factory(int fd) {
     auto tcp = std::make_unique<TCPLayer>(fd);

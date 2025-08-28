@@ -2,7 +2,6 @@
 #define CORE_TLS12_H
 
 
-#include <cstddef>
 #include <cstdint>
 #include <gmpxx.h>
 #include <optional>
@@ -11,7 +10,6 @@
 #include "core/aes.h"
 #include "core/cipher_mode.h"
 #include "core/diffie_hellman.h"
-#include "core/framed_rw.h"
 #include "core/mpz.h"
 #include "core/rsa.h"
 
@@ -65,8 +63,6 @@ protected:
     static std::string certificate_; ///< Server certificate, read from file
     static RSA rsa_; ///< Initialized with public key of the server certificate
 
-    FramedReaderWriter rw;
-
 public:
     /**
      * @brief Get the content type from the message
@@ -74,19 +70,6 @@ public:
      * @return A pair of integers representing the content type and the length of the message
      */
     static std::pair<int, int> get_content_type(const std::string &s);
-
-    /**
-     * @brief Get the lenght of the given record string
-     * @param s The string contains TLS record
-     */
-    static size_t get_record_length(const std::string &s);
-
-    /**
-     * @brief Constructs a TLS 1.2 object with the given lambdas to communicate with a peer
-     * @param read_f A lambda to read data from the peer
-     * @param write_f A lambda to write data to the peer
-     */
-    TLS12(const Read &read_f, const Write &write_f);
 
     /**
      * @brief Decode the message
@@ -102,12 +85,6 @@ public:
      * @return The encoded message
      */
     std::string encode(std::string &&s = "", int type = 0x17);
-
-    /**
-     * @brief Performs the TLS 1.2 handshake
-     * @return True if the handshake was successful, false otherwise
-     */
-    bool handshake();
 
     // ========== FOR HANDSHAKE ==========
 
@@ -137,10 +114,10 @@ public:
      */
     std::string alert(uint8_t level, uint8_t desc);
 
-protected:
     std::string accumulate(const std::string &s);
-
-    bool handshake_sub(std::string waiting_msg);
+    std::string accumulate_raw(const std::string &s);
+    void set_accumulate(const std::string &s);
+    std::string get_accumulate();
 
 private:
     void generate_signature(unsigned char *pub_key, unsigned char *sign) const;

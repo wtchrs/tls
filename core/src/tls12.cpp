@@ -23,7 +23,6 @@
 #include "core/rsa.h"
 #include "core/sha/sha2.h"
 #include "core/tls12_types.h"
-#include "core/tls_macros.h"
 #include "core/utils.h"
 
 std::string init_certificate() {
@@ -65,15 +64,6 @@ std::pair<int, int> TLS12<SV>::get_content_type(const std::string &s) {
     auto p = reinterpret_cast<const uint8_t *>(s.data());
     return {p[0], p[5]};
 }
-
-template<bool SV>
-size_t TLS12<SV>::get_record_length(const std::string &s) {
-    return s.size() < 5 ? 0 : static_cast<uint8_t>(s[3]) * 0x100 + static_cast<uint8_t>(s[4]) + 5;
-}
-
-template<bool SV>
-TLS12<SV>::TLS12(const Read &read_f, const Write &write_f)
-    : rw{read_f, write_f, TLS12<SV>::get_record_length} {}
 
 template<bool SV>
 std::optional<std::string> TLS12<SV>::decode(std::string &&s) {
@@ -422,83 +412,6 @@ std::string TLS12<SV>::finished(std::string &&s) {
     return "";
 }
 
-template<>
-bool TLS12<SV_SERVER>::handshake_sub(std::string waiting_msg) {
-    std::string s = waiting_msg;
-    std::optional<std::string> a;
-
-    s += this->server_certificate();
-    s += this->server_key_exchange();
-    s += this->server_hello_done();
-    rw.write(s);
-
-    EXPECT_RECEIVE(s, a, client_key_exchange);
-    EXPECT_RECEIVE(s, a, change_cipher_spec);
-    EXPECT_RECEIVE(s, a, finished);
-
-    s = this->change_cipher_spec();
-    s += finished();
-    rw.write(std::move(s));
-
-    return true;
-error:
-    rw.write(s);
-    return false;
-}
-
-template<>
-bool TLS12<SV_SERVER>::handshake() {
-    // server-side
-    std::string s;
-    std::optional<std::string> a;
-
-    EXPECT_RECEIVE(s, a, client_hello);
-
-    s = this->server_hello();
-    return handshake_sub(std::move(s));
-error:
-    rw.write(s);
-    return false;
-}
-
-template<>
-bool TLS12<SV_CLIENT>::handshake_sub(std::string waiting_msg) {
-    std::string s = waiting_msg;
-    std::optional<std::string> a;
-
-    EXPECT_RECEIVE(s, a, server_certificate);
-    EXPECT_RECEIVE(s, a, server_key_exchange);
-    EXPECT_RECEIVE(s, a, server_hello_done);
-
-    s = this->client_key_exchange();
-    s += this->change_cipher_spec();
-    s += TLS12<SV_CLIENT>::finished();
-    rw.write(std::move(s));
-
-    EXPECT_RECEIVE(s, a, change_cipher_spec);
-    EXPECT_RECEIVE(s, a, finished);
-
-    return true;
-error:
-    rw.write(s);
-    return false;
-}
-
-template<>
-bool TLS12<SV_CLIENT>::handshake() {
-    // client-side
-    std::string s;
-    std::optional<std::string> a;
-
-    rw.write(client_hello());
-    EXPECT_RECEIVE(s, a, server_hello);
-
-    return handshake_sub("");
-error:
-    rw.write(s);
-    return false;
-}
-
 template<bool SV>
 std::string TLS12<SV>::alert(const uint8_t level, const uint8_t desc) {
     const alert_message h{level, desc};
@@ -562,6 +475,22 @@ template<bool SV>
 std::string TLS12<SV>::accumulate(const std::string &s) {
     accumulated_handshakes_ += s.substr(sizeof(TLS_header));
     return s;
+}
+
+template<bool SV>
+std::string TLS12<SV>::accumulate_raw(const std::string &s) {
+    accumulated_handshakes_ += s;
+    return s;
+}
+
+template<bool SV>
+void TLS12<SV>::set_accumulate(const std::string &replace) {
+    accumulated_handshakes_ = replace;
+}
+
+template<bool SV>
+std::string TLS12<SV>::get_accumulate() {
+    return accumulated_handshakes_;
 }
 
 // Explicit template instantiation
