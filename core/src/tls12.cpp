@@ -5,10 +5,7 @@
 #include <cstdint>
 #include <fstream>
 #include <gmpxx.h>
-#include <ios>
-#include <iostream>
 #include <optional>
-#include <ostream>
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
@@ -27,22 +24,24 @@
 #include "core/tls_types.h"
 #include "core/utils.h"
 
-std::string init_certificate() {
+static tls::Record init_certificate_message() {
     std::ifstream cert_pem{"./cert/example/cert.pem"};
-    std::vector<unsigned char> r = {HANDSHAKE, 3, 3, 0, 0, CERTIFICATE, 0, 0, 0, 0, 0, 0};
+    std::vector<std::string> certificates;
     for (std::string s; !(s = get_certificate_core(cert_pem)).empty();) {
         auto v = base64_decode(s);
-        r.resize(r.size() + 3);
-        mpz2bnd(static_cast<int>(v.size()), r.end() - 3, r.end());
-        r.insert(r.end(), v.cbegin(), v.cend());
+        certificates.emplace_back(v.begin(), v.end());
     }
-    mpz2bnd(static_cast<int>(r.size() - 5), r.begin() + 3, r.begin() + 5); // size field of TLS header
-    mpz2bnd(static_cast<int>(r.size() - 9), r.begin() + 6, r.begin() + 9); // size field of TLS handshake header
-    mpz2bnd(static_cast<int>(r.size() - 12), r.begin() + 9, r.begin() + 12); // total size of certificates
-    return {r.cbegin(), r.cend()};
+    return tls::Record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::CERTIFICATE,
+            tls::Certificate{std::move(certificates)},
+        }}
+    };
 }
 
-RSA init_rsa() {
+static RSA init_rsa() {
     std::ifstream prv_pem{"./cert/example/key.pem"};
     if (!prv_pem.is_open()) {
         throw "Failed to open the private key PEM file.";
@@ -56,7 +55,7 @@ RSA init_rsa() {
 }
 
 template<bool SV>
-std::string TLS12<SV>::certificate_ = init_certificate();
+tls::Record TLS12<SV>::certificate_ = init_certificate_message();
 
 template<bool SV>
 RSA TLS12<SV>::rsa_ = init_rsa();
@@ -149,7 +148,7 @@ std::string TLS12<SV_CLIENT>::client_hello(std::string &&) {
 template<>
 std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
     auto res = tls::Record::parse(s);
-    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12)
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
         return alert(2, 10);
     if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (handshake->handshake_type != tls::CLIENT_HELLO)
@@ -170,9 +169,8 @@ std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
 template<>
 std::string TLS12<SV_CLIENT>::server_hello(std::string &&s) {
     auto res = tls::Record::parse(s);
-    if (!res || res->content_type != tls::HANDSHAKE || res->messages.empty()) {
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
         return alert(2, 10);
-    }
     if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (msg->handshake_type != tls::SERVER_HELLO)
             return alert(2, 10);
@@ -210,33 +208,33 @@ std::string TLS12<SV_SERVER>::server_hello(std::string &&) {
 
 template<>
 std::string TLS12<SV_CLIENT>::server_certificate(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CERTIFICATE}) {
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
         return alert(2, 10);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::CERTIFICATE)
+            return alert(2, 10);
+        accumulate(s);
+        tls::Certificate certificate = std::get<tls::Certificate>(msg->message);
+        // Read the first certificate and extract public key parameters.
+        // TODO: Change to check all certificate chains.
+        std::stringstream ss{certificate.certificates[0]};
+        auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
+        if (!opt_pubkey) {
+            spdlog::error("Failed to parse the received certificate.");
+            return alert(2, 44);
+        }
+        auto [K, e, sign] = *opt_pubkey;
+        rsa_.K_ = K;
+        rsa_.e_ = e;
+        return "";
     }
-    accumulate(s);
-    const auto msg = reinterpret_cast<certificate_message *>(s.data());
-    std::stringstream ss;
-    const uint8_t *p = msg->certificate_length[1]; // length of only the first certificate
-    // TODO: Change this method to check all certificate chains.
-    for (int i = 0, j = *p * 0x10000 + *(p + 1) * 0x100 + *(p + 2); i < j; i++) {
-        // Write bytes of the first certificate to ss
-        ss << std::noskipws << msg->certificate[i];
-    }
-    // Read the first certificate and extract public key parameters.
-    auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
-    if (!opt_pubkey) {
-        spdlog::error("Failed to parse the received certificate.");
-        return alert(2, 44);
-    }
-    auto [K, e, sign] = *opt_pubkey;
-    rsa_.K_ = K;
-    rsa_.e_ = e;
-    return "";
+    return alert(2, 40);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_certificate(std::string &&) {
-    return accumulate(certificate_);
+    return accumulate(certificate_.serialize());
 }
 
 template<bool SV>

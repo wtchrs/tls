@@ -23,9 +23,10 @@ const std::unordered_map< tls::ExtensionType, std::function<std::optional<tls::E
 
 const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::HandshakeMsg>(const std::string &)>>
     handshake_parsing_handlers{
-        {tls::CLIENT_HELLO, tls::ClientHello::parse}, {tls::SERVER_HELLO, tls::ServerHello::parse},
-        /*
+        {tls::CLIENT_HELLO, tls::ClientHello::parse},
+        {tls::SERVER_HELLO, tls::ServerHello::parse},
         {tls::CERTIFICATE, tls::Certificate::parse},
+        /*
         {tls::SERVER_KEY_EXCHANGE, tls::ServerKeyExchange::parse},
         {tls::SERVER_HELLO_DONE, tls::ServerHelloDone::parse},
         {tls::CLIENT_KEY_EXCHANGE, tls::ClientKeyExchange::parse},
@@ -246,6 +247,39 @@ std::string ServerHello::serialize() const {
     if (this->extensions)
         msg.append(this->extensions->serialize());
     return msg;
+}
+
+Certificate::Certificate(std::vector<std::string> &&certificates)
+    : certificates{std::move(certificates)} {}
+
+std::optional<Certificate> Certificate::parse(const std::string &raw) {
+    size_t total_len =
+        (static_cast<uint8_t>(raw[0]) << 16) + (static_cast<uint8_t>(raw[1]) << 8) + static_cast<uint8_t>(raw[2]) + 3;
+    Certificate certificate;
+    for (size_t pos = 3; pos < total_len;) {
+        size_t len = (static_cast<uint8_t>(raw[pos]) << 16) + (static_cast<uint8_t>(raw[pos + 1]) << 8) +
+                     static_cast<uint8_t>(raw[pos + 2]);
+        certificate.certificates.push_back(raw.substr(pos + 3, pos + 3 + len));
+        pos += len + 3;
+    }
+    return certificate;
+}
+
+std::string Certificate::serialize() const {
+    std::string msg;
+    for (const auto &cert : this->certificates) {
+        size_t len = cert.length();
+        msg.append(1, len >> 16);
+        msg.append(1, len >> 8);
+        msg.append(1, len);
+        msg.append(cert);
+    }
+    size_t total_len = msg.length();
+    std::string r;
+    r.append(1, total_len >> 16);
+    r.append(1, total_len >> 8);
+    r.append(1, total_len);
+    return r + msg;
 }
 
 

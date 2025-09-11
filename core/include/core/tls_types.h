@@ -153,15 +153,12 @@ struct Extensions : public BaseMessage {
 struct ClientHello : BaseMessage {
     ProtocolVersion client_hello_version = TLS_VERSION_12;
     std::array<uint8_t, 32> client_random;
-    // session_id_length(1byte)
     std::vector<uint8_t> session_id;
-    // cipher suite length in byte(2byte)
+
     /** Cipher suite list that client can accept. */
     std::vector<CipherSuite> cipher_suites;
-    // compression length(1byte)
     std::vector<uint8_t> compression_methods;
 
-    // Extensions
     std::optional<Extensions> extensions;
 
     ClientHello() {}
@@ -182,8 +179,8 @@ struct ClientHello : BaseMessage {
 struct ServerHello : public BaseMessage {
     ProtocolVersion server_hello_version = TLS_VERSION_12;
     std::array<uint8_t, 32> server_random;
-    // session_id_length(1byte)
     std::vector<uint8_t> session_id;
+
     /** Cipher suite that server chose. */
     CipherSuite cipher_suite;
     /** Compression method that server chose. */
@@ -206,12 +203,19 @@ struct ServerHello : public BaseMessage {
     std::string serialize() const override;
 };
 
-/*
 struct Certificate : public BaseMessage {
+    std::vector<std::string> certificates;
+
+    Certificate() {}
+    Certificate(std::vector<std::string> &&certificates);
+
     ~Certificate() {}
+
     static std::optional<Certificate> parse(const std::string &raw);
     std::string serialize() const override;
 };
+
+/*
 struct ServerKeyExchange : public BaseMessage {
     ~ServerKeyExchange() {}
     static std::optional<ServerKeyExchange> parse(const std::string &raw);
@@ -236,7 +240,8 @@ struct Finished : public BaseMessage {
 
 using HandshakeMsg = std::variant<
     ClientHello,
-    ServerHello /*, Certificate, ServerKeyExchange, ServerHelloDone, ClientKeyExchange, Finished */>;
+    ServerHello,
+    Certificate /*, ServerKeyExchange, ServerHelloDone, ClientKeyExchange, Finished */>;
 
 struct Handshake : public BaseMessage {
     HandshakeType handshake_type;

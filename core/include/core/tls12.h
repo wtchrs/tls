@@ -12,6 +12,7 @@
 #include "core/diffie_hellman.h"
 #include "core/mpz.h"
 #include "core/rsa.h"
+#include "core/tls_types.h"
 
 #define SV_SERVER true
 #define SV_CLIENT false
@@ -61,7 +62,7 @@ protected:
     std::vector<unsigned char> master_secret_;
 
     std::string accumulated_handshakes_; ///< Accumulated handshake messages
-    static std::string certificate_; ///< Server certificate, read from file
+    static tls::Record certificate_; ///< Server certificate message, read from file
     static RSA rsa_; ///< Initialized with public key of the server certificate
 
 public:
