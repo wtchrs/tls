@@ -149,12 +149,11 @@ std::string TLS12<SV_CLIENT>::client_hello(std::string &&) {
 template<>
 std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
     auto res = tls::Record::parse(s);
-    if (!res)
-        return alert(2, 80); // TODO: Change to proper error description.
-    if (res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12)
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12)
         return alert(2, 10);
-    if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0]);
-        handshake->handshake_type == tls::CLIENT_HELLO) {
+    if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (handshake->handshake_type != tls::CLIENT_HELLO)
+            return alert(2, 10);
         auto client_hello = std::get<tls::ClientHello>(handshake->message);
         accumulate(s);
         std::copy(client_hello.client_random.begin(), client_hello.client_random.end(), this->client_random_.begin());
@@ -170,29 +169,43 @@ std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
 
 template<>
 std::string TLS12<SV_CLIENT>::server_hello(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->messages.empty()) {
         return alert(2, 10);
     }
-    accumulate(s);
-    const auto msg = reinterpret_cast<server_hello_message *>(s.data());
-    std::copy_n(msg->hello.random, 32, server_random_.begin());
-    std::copy_n(msg->hello.session_id, 32, session_id_.begin());
-    // Return null string if cipher suite is TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f).
-    if (msg->cipher_suite[0] == 0xc0 && msg->cipher_suite[1] == 0x2f) {
-        return "";
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::SERVER_HELLO)
+            return alert(2, 10);
+        accumulate(s);
+        auto server_hello = std::get<tls::ServerHello>(msg->message);
+        std::copy(server_hello.server_random.begin(), server_hello.server_random.end(), this->server_random_.begin());
+        this->session_id_.resize(server_hello.session_id.size());
+        std::copy(server_hello.session_id.begin(), server_hello.session_id.end(), this->session_id_.begin());
+        if (server_hello.cipher_suite == tls::TLS_ECDHE_RSA_AES128_GCM_SHA256)
+            return ""; // success
     }
-    // If not, return alert message.
     return alert(2, 40);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_hello(std::string &&) {
-    server_hello_message msg;
-    mpz2bnd(random_prime(32), server_random_.begin(), server_random_.end());
-    mpz2bnd(random_prime(32), session_id_.begin(), session_id_.end());
-    std::copy(server_random_.begin(), server_random_.end(), msg.hello.random);
-    std::copy(session_id_.cbegin(), session_id_.cend(), msg.hello.session_id);
-    return accumulate(struct2str(msg));
+    mpz2bnd(random_prime(32), this->server_random_.begin(), this->server_random_.end());
+    mpz2bnd(random_prime(32), this->session_id_.begin(), this->session_id_.end());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::SERVER_HELLO,
+            tls::ServerHello{
+                tls::TLS_VERSION_12,
+                std::array<uint8_t, 32>{this->server_random_},
+                std::vector<uint8_t>{this->session_id_},
+                tls::TLS_ECDHE_RSA_AES128_GCM_SHA256,
+                0
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>

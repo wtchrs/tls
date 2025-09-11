@@ -152,21 +152,16 @@ struct Extensions : public BaseMessage {
 
 struct ClientHello : BaseMessage {
     ProtocolVersion client_hello_version = TLS_VERSION_12;
-    // length(3byte)
-    // uint8_t client_random[32];
     std::array<uint8_t, 32> client_random;
     // session_id_length(1byte)
     std::vector<uint8_t> session_id;
     // cipher suite length in byte(2byte)
-    /**
-     * Cipher suite list that client can accept.
-     * In TLS12 implementation, only TLS_ECDHE_RSA_AES128_GCM_SHA256 cipher suite (0xc02f) is concidered.
-     */
+    /** Cipher suite list that client can accept. */
     std::vector<CipherSuite> cipher_suites;
     // compression length(1byte)
     std::vector<uint8_t> compression_methods;
 
-    // Extentions
+    // Extensions
     std::optional<Extensions> extensions;
 
     ClientHello() {}
@@ -184,13 +179,34 @@ struct ClientHello : BaseMessage {
     std::string serialize() const override;
 };
 
-/*
 struct ServerHello : public BaseMessage {
+    ProtocolVersion server_hello_version = TLS_VERSION_12;
+    std::array<uint8_t, 32> server_random;
+    // session_id_length(1byte)
+    std::vector<uint8_t> session_id;
+    /** Cipher suite that server chose. */
+    CipherSuite cipher_suite;
+    /** Compression method that server chose. */
+    uint8_t compression_method;
+
+    std::optional<Extensions> extensions;
+
+    ServerHello() {}
+    ServerHello(
+        ProtocolVersion protocol_version,
+        std::array<uint8_t, 32> &&server_random,
+        std::vector<uint8_t> &&session_id,
+        CipherSuite cipher_suite,
+        uint8_t compression_method
+    );
+
     ~ServerHello() {}
+
     static std::optional<ServerHello> parse(const std::string &raw);
     std::string serialize() const override;
 };
 
+/*
 struct Certificate : public BaseMessage {
     ~Certificate() {}
     static std::optional<Certificate> parse(const std::string &raw);
@@ -219,7 +235,8 @@ struct Finished : public BaseMessage {
 */
 
 using HandshakeMsg = std::variant<
-    ClientHello /*, ServerHello, Certificate, ServerKeyExchange, ServerHelloDone, ClientKeyExchange, Finished*/>;
+    ClientHello,
+    ServerHello /*, Certificate, ServerKeyExchange, ServerHelloDone, ClientKeyExchange, Finished */>;
 
 struct Handshake : public BaseMessage {
     HandshakeType handshake_type;

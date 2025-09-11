@@ -10,7 +10,7 @@
 
 
 const std::unordered_map< tls::ExtensionType, std::function<std::optional<tls::ExtensionMsg>(const std::string &)>>
-    extension_parse_handlers{
+    extension_parsing_handlers{
         {tls::SUPPORTED_GROUPS, tls::SupportedGroups::parse},
         /*
         {tls::EC_POINT_FORMATS, tls::ECPointFormats::parse},
@@ -18,6 +18,18 @@ const std::unordered_map< tls::ExtensionType, std::function<std::optional<tls::E
         {tls::SUPPORTED_VERSIONS, tls::SupportedVersions::parse},
         {tls::PSK_KEY_EXCHANGE_MODES, tls::PskMode::parse},
         {tls::SIGNATURE_ALGORITHMS, tls::SignatureAlgorithms::parse},
+        */
+    };
+
+const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::HandshakeMsg>(const std::string &)>>
+    handshake_parsing_handlers{
+        {tls::CLIENT_HELLO, tls::ClientHello::parse}, {tls::SERVER_HELLO, tls::ServerHello::parse},
+        /*
+        {tls::CERTIFICATE, tls::Certificate::parse},
+        {tls::SERVER_KEY_EXCHANGE, tls::ServerKeyExchange::parse},
+        {tls::SERVER_HELLO_DONE, tls::ServerHelloDone::parse},
+        {tls::CLIENT_KEY_EXCHANGE, tls::ClientKeyExchange::parse},
+        {tls::FINISHED, tls::Finished::parse},
         */
     };
 
@@ -92,25 +104,13 @@ std::optional<Handshake> Handshake::parse(const std::string &raw) {
         (static_cast<uint8_t>(raw[1]) << 16) + (static_cast<uint8_t>(raw[2]) << 8) + static_cast<uint8_t>(raw[3]);
     auto subraw = raw.substr(4, 4 + length);
 
-    switch (handshake.handshake_type) {
-    // TODO: Implement each cases.
-    case HELLO_REQUEST: break;
-    case CLIENT_HELLO: {
-        auto msg = ClientHello::parse(subraw);
-        if (!msg)
-            return std::nullopt;
-        handshake.message = *msg;
-        break;
-    }
-    case SERVER_HELLO: break;
-    case CERTIFICATE: break;
-    case SERVER_KEY_EXCHANGE: break;
-    case CERTIFICATE_REQUEST: break;
-    case SERVER_DONE: break;
-    case CERTIFICATE_VERIFY: break;
-    case CLIENT_KEY_EXCHANGE: break;
-    case FINISHED: break;
-    }
+    const auto &handler = handshake_parsing_handlers.find(handshake.handshake_type);
+    if (handler == handshake_parsing_handlers.end())
+        return std::nullopt;
+    auto res = handler->second(subraw);
+    if (!res)
+        return std::nullopt;
+    handshake.message = *res;
 
     return handshake;
 }
@@ -145,7 +145,7 @@ std::optional<ClientHello> ClientHello::parse(const std::string &raw) {
     ClientHello client_hello;
     client_hello.client_hello_version =
         static_cast<ProtocolVersion>((static_cast<uint8_t>(raw[0]) << 8) + static_cast<uint8_t>(raw[1]));
-    std::copy_n(&raw[2], 32, client_hello.client_random.data());
+    std::copy_n(&raw[2], 32, client_hello.client_random.begin());
     size_t session_id_length = static_cast<uint8_t>(raw[34]);
     client_hello.session_id.resize(session_id_length);
     std::copy_n(&raw[35], session_id_length, client_hello.session_id.begin());
@@ -197,6 +197,60 @@ std::string ClientHello::serialize() const {
     return r;
 }
 
+ServerHello::ServerHello(
+    ProtocolVersion protocol_version,
+    std::array<uint8_t, 32> &&server_random,
+    std::vector<uint8_t> &&session_id,
+    CipherSuite cipher_suite,
+    uint8_t compression_method
+)
+    : server_hello_version{protocol_version}
+    , server_random{std::move(server_random)}
+    , session_id{std::move(session_id)}
+    , cipher_suite{cipher_suite}
+    , compression_method{compression_method} {}
+
+std::optional<ServerHello> ServerHello::parse(const std::string &raw) {
+    ServerHello server_hello;
+    server_hello.server_hello_version =
+        static_cast<ProtocolVersion>((static_cast<uint8_t>(raw[0]) << 8) + static_cast<uint8_t>(raw[1]));
+    std::copy_n(&raw[2], 32, server_hello.server_random.begin());
+    size_t session_id_length = static_cast<uint8_t>(raw[34]);
+    server_hello.session_id.resize(session_id_length);
+    std::copy_n(&raw[35], session_id_length, server_hello.session_id.begin());
+    size_t cs_pos = 35 + session_id_length;
+    auto raw_cipher_suite = (static_cast<uint8_t>(raw[cs_pos]) << 8) + static_cast<uint8_t>(raw[cs_pos + 1]);
+    server_hello.cipher_suite = static_cast<CipherSuite>(raw_cipher_suite);
+    size_t comp_pos = cs_pos + 2;
+    server_hello.compression_method = static_cast<uint8_t>(raw[comp_pos]);
+    if (comp_pos + 1 < raw.length()) {
+        auto ext = Extensions::parse(raw.substr(comp_pos + 1));
+        if (!ext)
+            return std::nullopt;
+        server_hello.extensions = std::move(ext);
+    }
+    return server_hello;
+}
+
+std::string ServerHello::serialize() const {
+    std::string msg;
+    msg.append(1, this->server_hello_version >> 8);
+    msg.append(1, this->server_hello_version);
+    msg.append(this->server_random.begin(), this->server_random.end());
+    auto session_id_length = this->session_id.size();
+    msg.append(1, session_id_length);
+    msg.append(this->session_id.begin(), this->session_id.end());
+    msg.append(1, this->cipher_suite >> 8);
+    msg.append(1, this->cipher_suite);
+    msg.append(1, this->compression_method);
+    if (this->extensions)
+        msg.append(this->extensions->serialize());
+    return msg;
+}
+
+
+/***** Extension Messages *****/
+
 std::optional<Extensions> Extensions::parse(const std::string &raw) {
     Extensions extensions;
     size_t total_length = (static_cast<uint8_t>(raw[0]) << 8) + static_cast<uint8_t>(raw[1]);
@@ -205,8 +259,8 @@ std::optional<Extensions> Extensions::parse(const std::string &raw) {
         auto type =
             static_cast<ExtensionType>((static_cast<uint8_t>(raw[pos]) << 8) + static_cast<uint8_t>(raw[pos + 1]));
         size_t ext_length = (static_cast<uint8_t>(raw[pos + 2]) << 8) + static_cast<uint8_t>(raw[pos + 3]) + 4;
-        auto handler = extension_parse_handlers.find(type);
-        if (handler == extension_parse_handlers.end())
+        auto handler = extension_parsing_handlers.find(type);
+        if (handler == extension_parsing_handlers.end())
             return std::nullopt;
         auto res = handler->second(raw.substr(pos, pos + ext_length));
         if (!res)
@@ -228,8 +282,6 @@ std::string Extensions::serialize() const {
     r.append(1, total_length);
     return r + contents;
 }
-
-/***** Extension Messages *****/
 
 std::optional<SupportedGroups> SupportedGroups::parse(const std::string &raw) {
     size_t ext_len = (static_cast<uint8_t>(raw[2]) << 8) + static_cast<uint8_t>(raw[3]);

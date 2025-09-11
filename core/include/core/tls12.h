@@ -50,7 +50,8 @@ protected:
     mpz_class prv_key_ = random_prime(31); ///< Private key for the curve
     ECPoint P_{prv_key_ * G_}; ///< Public key for the curve
 
-    std::array<unsigned char, 32> session_id_ = {}, server_random_ = {}, client_random_ = {};
+    std::array<unsigned char, 32> server_random_ = {}, client_random_ = {};
+    std::vector<unsigned char> session_id_{};
 
     /**
      * @brief Master secret for the session
