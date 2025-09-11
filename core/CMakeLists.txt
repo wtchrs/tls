@@ -11,6 +11,7 @@ file(GLOB_RECURSE SOURCES
         src/sha1.cpp
         src/tls12.cpp
         src/tls13.cpp
+        src/tls_types.cpp
 )
 
 add_library(core STATIC ${SOURCES})

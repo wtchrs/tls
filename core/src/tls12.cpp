@@ -13,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 #include "core/base64.h"
 #include "core/cert.h"
@@ -23,6 +24,7 @@
 #include "core/rsa.h"
 #include "core/sha/sha2.h"
 #include "core/tls12_types.h"
+#include "core/tls_types.h"
 #include "core/utils.h"
 
 std::string init_certificate() {
@@ -124,32 +126,46 @@ std::string TLS12<SV>::encode(std::string &&s, const int type) {
 
 template<>
 std::string TLS12<SV_CLIENT>::client_hello(std::string &&) {
-    client_hello_message msg;
-    msg.tls.set_length(sizeof(msg) - sizeof(msg.tls));
-    msg.handshake.set_length(sizeof(msg) - sizeof(msg.tls) - sizeof(msg.handshake));
-    mpz2bnd(random_prime(32), msg.hello.random, msg.hello.random + 32);
-    std::copy_n(msg.hello.random, 32, client_random_.data());
-    return accumulate(struct2str(msg));
+    std::array<uint8_t, 32> client_random;
+    mpz2bnd(random_prime(32), client_random.begin(), client_random.end());
+    std::copy(client_random.begin(), client_random.end(), this->client_random_.begin());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::CLIENT_HELLO,
+            tls::ClientHello{
+                tls::TLS_VERSION_12,
+                std::move(client_random),
+                std::vector<uint8_t>(32),
+                std::vector{tls::TLS_ECDHE_RSA_AES128_GCM_SHA256},
+                std::vector<uint8_t>{0}
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
+    auto res = tls::Record::parse(s);
+    if (!res)
+        return alert(2, 80); // TODO: Change to proper error description.
+    if (res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12)
         return alert(2, 10);
-    }
-    accumulate(s);
-    auto *received = reinterpret_cast<client_hello_message *>(s.data());
-    std::copy_n(received->hello.random, 32, client_random_.data());
-    const int len = received->get_cipher_suite_length();
-    const unsigned char *p = received->cipher_suite;
-    // Return null string if TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f) exists in cipher suite list.
-    for (int i = 0; i < len; i += 2) {
-        if (*(p + i) == 0xc0 && *(p + i + 1) == 0x2f) {
-            return "";
+    if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0]);
+        handshake->handshake_type == tls::CLIENT_HELLO) {
+        auto client_hello = std::get<tls::ClientHello>(handshake->message);
+        accumulate(s);
+        std::copy(client_hello.client_random.begin(), client_hello.client_random.end(), this->client_random_.begin());
+        for (const auto &cipher_suite : client_hello.cipher_suites) {
+            // Support only the one cipher suite.
+            if (cipher_suite == tls::TLS_ECDHE_RSA_AES128_GCM_SHA256) {
+                return ""; // success
+            }
         }
     }
-    // If not, return alert message.
-    return alert(2, 40);
+    return alert(2, 40); // handshake_failure
 }
 
 template<>
