@@ -298,43 +298,61 @@ void TLS12<SV>::derive_keys(const mpz_class &premaster_secret) {
 
 template<>
 std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
         return alert(2, 10);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::SERVER_KEY_EXCHANGE)
+            return alert(2, 10);
+        accumulate(s);
+        auto server_key_exchange = std::get<tls::EcdheRsaServerKeyExchange>(msg->message);
+        // Extract server's ephemeral public key from received message.
+        const ECPoint Y{
+            bnd2mpz(server_key_exchange.x.begin(), server_key_exchange.x.end()),
+            bnd2mpz(server_key_exchange.y.begin(), server_key_exchange.y.end()),
+            secp256r1_
+        };
+        // Compute shared key.
+        derive_keys((prv_key_ * Y).x_);
+
+        // Check signature.
+        auto z = rsa_.encode(bnd2mpz(server_key_exchange.sign.begin(), server_key_exchange.sign.end()));
+        unsigned char check_sig[RSA_SIG_SIZE];
+        mpz2bnd(z, check_sig, check_sig + sizeof(check_sig));
+        std::vector<uint8_t> check_hash;
+        check_hash.insert(check_hash.end(), client_random_.begin(), client_random_.end());
+        check_hash.insert(check_hash.end(), server_random_.begin(), server_random_.end());
+        check_hash.push_back(server_key_exchange.curve_type);
+        check_hash.push_back(server_key_exchange.named_curve >> 8);
+        check_hash.push_back(server_key_exchange.named_curve);
+        auto point_len = 1 + sizeof(server_key_exchange.x) + sizeof(server_key_exchange.y);
+        check_hash.push_back(point_len);
+        check_hash.push_back(server_key_exchange.point_format);
+        check_hash.insert(check_hash.end(), server_key_exchange.x.begin(), server_key_exchange.x.end());
+        check_hash.insert(check_hash.end(), server_key_exchange.y.begin(), server_key_exchange.y.end());
+
+        SHA256 sha;
+        auto hash = sha.hash(check_hash.begin(), check_hash.end());
+
+        spdlog::debug("Encoded RSA Signature and hash must be same.");
+        spdlog::debug("Encoded RSA Signature: 0x{}", z.get_str(16));
+        spdlog::debug("Hash: 0x{}", bnd2mpz(hash.crbegin(), hash.crend()).get_str(16));
+
+        if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
+            spdlog::error("server_key_exchange:client: Check signature - fail");
+            return alert(2, 51); // decrypt error
+        }
+
+        spdlog::info("server_key_exchange:client: Check signature - success");
+        return "";
     }
-    accumulate(s);
-    const auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
-    // Extract server's ephemeral public key from received message.
-    const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
-    // Compute shared key.
-    derive_keys((prv_key_ * Y).x_);
 
-    // Check signature.
-    auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + RSA_SIG_SIZE));
-    unsigned char check_sig[RSA_SIG_SIZE];
-    mpz2bnd(z, check_sig, check_sig + RSA_SIG_SIZE);
-    unsigned char check_hash[MESSAGE_TO_HASH_SIZE];
-    std::copy(client_random_.cbegin(), client_random_.cend(), check_hash);
-    std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + RANDOM_SIZE);
-    std::copy_n(&p->named_curve, PUBKEY_SIZE, check_hash + RANDOM_SIZE * 2);
-
-    SHA256 sha;
-    auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
-
-    spdlog::debug("Encoded RSA Signature and hash must be same.");
-    spdlog::debug("Encoded RSA Signature: 0x{}", z.get_str(16));
-    spdlog::debug("Hash: 0x{}", bnd2mpz(hash.crbegin(), hash.crend()).get_str(16));
-
-    if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
-        spdlog::error("server_key_exchange:client: Check signature - fail");
-        return alert(2, 51); // decrypt error
-    }
-
-    spdlog::info("server_key_exchange:client: Check signature - success");
-    return "";
+    return alert(2, 40);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
+    /*
     server_key_exchange_message msg;
     msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
     msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
@@ -343,6 +361,40 @@ std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
     mpz2bnd(P_.y_, msg.y, msg.y + 32);
     generate_signature(&msg.named_curve, msg.sign);
     return accumulate(struct2str(msg));
+    */
+
+    // FIX: Failed TLS 1.2 handshake test intermittently.
+    std::array<uint8_t, 32> x, y;
+    mpz2bnd(P_.x_, x.begin(), x.end());
+    mpz2bnd(P_.y_, y.begin(), y.end());
+    std::vector<uint8_t> sign(RSA_SIG_SIZE), pub_key;
+    pub_key.push_back(tls::NAMED_CURVE);
+    pub_key.push_back(tls::NC_SECP256R1 >> 8);
+    pub_key.push_back(tls::NC_SECP256R1);
+    auto point_len = 1 + x.size() + y.size();
+    pub_key.push_back(point_len);
+    pub_key.push_back(4); // uncompressed
+    pub_key.insert(pub_key.end(), x.begin(), x.end());
+    pub_key.insert(pub_key.end(), y.begin(), y.end());
+    generate_signature(pub_key.data(), sign.data());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::SERVER_KEY_EXCHANGE,
+            tls::EcdheRsaServerKeyExchange{
+                tls::NAMED_CURVE,
+                tls::NC_SECP256R1,
+                0x04,
+                std::move(x),
+                std::move(y),
+                tls::SHA256,
+                tls::RSA,
+                std::move(sign)
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>

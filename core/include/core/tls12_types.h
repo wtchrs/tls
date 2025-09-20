@@ -111,12 +111,14 @@ struct server_key_exchange_message {
     TLS_header tls;
     handshake_header handshake;
 
+    // ServerECDHParams params;
     uint8_t named_curve = 3;
-    uint8_t secp256r[2] = {0, 0x17};
+    uint8_t secp256r1[2] = {0, 0x17};
     uint8_t key_length = 65;
     uint8_t uncompressed = 4;
     uint8_t x[32] = {}, y[32] = {};
 
+    // SignatureAndHashAlgorithm
     /**
      * signature hash  value
      * NONE            0
@@ -136,6 +138,8 @@ struct server_key_exchange_message {
      * ECDSA           3
      */
     uint8_t signature_sign = 1;
+
+    // Signature signed_params;
     uint8_t signature_length[2] = {1, 0}; // length: 256 (0x100)
     uint8_t sign[RSA_SIG_SIZE] = {};
 };

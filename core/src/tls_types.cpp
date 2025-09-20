@@ -26,8 +26,8 @@ const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::Ha
         {tls::CLIENT_HELLO, tls::ClientHello::parse},
         {tls::SERVER_HELLO, tls::ServerHello::parse},
         {tls::CERTIFICATE, tls::Certificate::parse},
+        {tls::SERVER_KEY_EXCHANGE, tls::EcdheRsaServerKeyExchange::parse},
         /*
-        {tls::SERVER_KEY_EXCHANGE, tls::ServerKeyExchange::parse},
         {tls::SERVER_HELLO_DONE, tls::ServerHelloDone::parse},
         {tls::CLIENT_KEY_EXCHANGE, tls::ClientKeyExchange::parse},
         {tls::FINISHED, tls::Finished::parse},
@@ -280,6 +280,64 @@ std::string Certificate::serialize() const {
     r.append(1, total_len >> 8);
     r.append(1, total_len);
     return r + msg;
+}
+
+EcdheRsaServerKeyExchange::EcdheRsaServerKeyExchange(
+    ECCurveType curve_type,
+    NamedCurve named_curve,
+    uint8_t point_format,
+    std::array<uint8_t, 32> &&x,
+    std::array<uint8_t, 32> &&y,
+    HashAlgorithm hash,
+    SignatureAlgorithm signature,
+    std::vector<uint8_t> &&sign
+)
+    : curve_type{curve_type}
+    , named_curve{named_curve}
+    , point_format{point_format}
+    , x{std::move(x)}
+    , y{std::move(y)}
+    , hash{hash}
+    , signature{signature}
+    , sign{std::move(sign)} {}
+
+std::optional<EcdheRsaServerKeyExchange> EcdheRsaServerKeyExchange::parse(const std::string &raw) {
+    EcdheRsaServerKeyExchange message;
+    message.curve_type = static_cast<ECCurveType>(static_cast<uint8_t>(raw[0]));
+    message.named_curve = static_cast<NamedCurve>((static_cast<uint8_t>(raw[1]) << 8) + static_cast<uint8_t>(raw[2]));
+    if (message.curve_type != NAMED_CURVE || message.named_curve != NC_SECP256R1)
+        return std::nullopt;
+    size_t key_len = static_cast<uint8_t>(raw[3]);
+    message.point_format = static_cast<uint8_t>(raw[4]);
+    if (key_len != 65 || message.point_format != 4)
+        return std::nullopt;
+    std::copy_n(&raw[5], 32, message.x.begin());
+    std::copy_n(&raw[37], 32, message.y.begin());
+    message.hash = static_cast<HashAlgorithm>(static_cast<uint8_t>(raw[69]));
+    message.signature = static_cast<SignatureAlgorithm>(static_cast<uint8_t>(raw[70]));
+    size_t sign_len = (static_cast<uint8_t>(raw[71]) << 8) + static_cast<uint8_t>(raw[72]);
+    message.sign.resize(sign_len);
+    std::copy_n(&raw[73], sign_len, message.sign.begin());
+    return message;
+}
+
+std::string EcdheRsaServerKeyExchange::serialize() const {
+    std::string msg;
+    msg.append(1, this->curve_type);
+    msg.append(1, this->named_curve >> 8);
+    msg.append(1, this->named_curve);
+    size_t point_len = 1 + this->x.size() + this->y.size(); // point_format + x + y
+    msg.append(1, point_len);
+    msg.append(1, this->point_format);
+    msg.append(this->x.begin(), this->x.end());
+    msg.append(this->y.begin(), this->y.end());
+    msg.append(1, this->hash);
+    msg.append(1, this->signature);
+    auto sign_len = this->sign.size();
+    msg.append(1, sign_len >> 8);
+    msg.append(1, sign_len);
+    msg.append(this->sign.begin(), this->sign.end());
+    return msg;
 }
 
 

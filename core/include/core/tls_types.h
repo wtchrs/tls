@@ -12,14 +12,11 @@
 
 namespace tls {
 
-// 1 byte
-enum ContentType { CHANGE_CIPHER_SPEC = 0x14, ALERT = 0x15, HANDSHAKE = 0x16, APPLICATION_DATA = 0x17 };
+enum ContentType : uint8_t { CHANGE_CIPHER_SPEC = 0x14, ALERT = 0x15, HANDSHAKE = 0x16, APPLICATION_DATA = 0x17 };
 
-// 2 bytes
-enum ProtocolVersion { TLS_VERSION_12 = 0x0303, TLS_VERSION_13 = 0x0304 };
+enum ProtocolVersion : uint16_t { TLS_VERSION_12 = 0x0303, TLS_VERSION_13 = 0x0304 };
 
-// 1 byte
-enum HandshakeType {
+enum HandshakeType : uint8_t {
     HELLO_REQUEST = 0x00,
     CLIENT_HELLO = 0x01,
     SERVER_HELLO = 0x02,
@@ -32,15 +29,64 @@ enum HandshakeType {
     FINISHED = 0x14
 };
 
-// 2 bytes
-enum CipherSuite {
-    // 2 cipher suites are currently supported.
+enum CipherSuite : uint16_t {
+    // 2 cipher suites are currently supported in this implementation.
     TLS_ECDHE_RSA_AES128_GCM_SHA256 = 0xc02f, // TLS 1.2
     TLS_AES_128_GCM_SHA256 = 0x1301, // TLS 1.3
 };
 
-// 2 bytes
-enum ExtensionType {
+enum ECCurveType : uint8_t {
+    EXPLICIT_PRIME = 1,
+    EXPLICIT_CHAR2 = 2,
+    NAMED_CURVE = 3,
+    // reserved(248..255)
+};
+
+enum NamedCurve : uint16_t {
+    NC_SECT163K1 = 1,
+    NC_SECT163R1 = 2,
+    NC_SECT163R2 = 3,
+    NC_SECT193R1 = 4,
+    NC_SECT193R2 = 5,
+    NC_SECT233K1 = 6,
+    NC_SECT233R1 = 7,
+    NC_SECT239K1 = 8,
+    NC_SECT283K1 = 9,
+    NC_SECT283R1 = 10,
+    NC_SECT409K1 = 11,
+    NC_SECT409R1 = 12,
+    NC_SECT571K1 = 13,
+    NC_SECT571R1 = 14,
+    NC_SECP160K1 = 15,
+    NC_SECP160R1 = 16,
+    NC_SECP160R2 = 17,
+    NC_SECP192K1 = 18,
+    NC_SECP192R1 = 19,
+    NC_SECP224K1 = 20,
+    NC_SECP224R1 = 21,
+    NC_SECP256K1 = 22,
+    NC_SECP256R1 = 23,
+    NC_SECP384R1 = 24,
+    NC_SECP521R1 = 25,
+    // reserved (0xFE00..0xFEFF),
+    NC_ARBITRARY_EXPLICIT_PRIME_CURVES = 0xFF01,
+    NC_ARBITRARY_EXPLICIT_CHAR2_CURVES = 0xFF02,
+    // (0xFFFF)
+};
+
+enum HashAlgorithm : uint8_t {
+    NONE = 0,
+    MD5 = 1,
+    SHA1 = 2,
+    SHA224 = 3,
+    SHA256 = 4,
+    SHA384 = 5,
+    SHA512 = 6,
+};
+
+enum SignatureAlgorithm : uint8_t { ANONYMOUS = 0, RSA = 1, DSA = 2, ECDSA = 3 };
+
+enum ExtensionType : uint16_t {
     SERVER_NAME = 0,
     MAX_FRAGMENT_LENGTH = 1,
     STATUS_REQUEST = 5,
@@ -66,21 +112,20 @@ enum ExtensionType {
     KEY_SHARE = 51,
 };
 
-// 2 bytes
-enum NamedGroup {
+enum NamedGroup : uint16_t {
     /* Elliptic Curve Groups (ECDHE) */
-    SECP256R1 = 0x0017,
-    SECP384R1 = 0x0018,
-    SECP521R1 = 0x0019,
-    X25519 = 0x001D,
-    X448 = 0x001E,
+    NG_SECP256R1 = 0x0017,
+    NG_SECP384R1 = 0x0018,
+    NG_SECP521R1 = 0x0019,
+    NG_X25519 = 0x001D,
+    NG_X448 = 0x001E,
 
     /* Finite Field Groups (DHE) */
-    FFDHE2048 = 0x0100,
-    FFDHE3072 = 0x0101,
-    FFDHE4096 = 0x0102,
-    FFDHE6144 = 0x0103,
-    FFDHE8192 = 0x0104,
+    NG_FFDHE2048 = 0x0100,
+    NG_FFDHE3072 = 0x0101,
+    NG_FFDHE4096 = 0x0102,
+    NG_FFDHE6144 = 0x0103,
+    NG_FFDHE8192 = 0x0104,
 
     /* Reserved Code Points */
     /* FFDHE_PRIVATE_USE(0x01FC..0x01FF) */
@@ -215,12 +260,45 @@ struct Certificate : public BaseMessage {
     std::string serialize() const override;
 };
 
-/*
-struct ServerKeyExchange : public BaseMessage {
-    ~ServerKeyExchange() {}
-    static std::optional<ServerKeyExchange> parse(const std::string &raw);
+// Currently implemented ECDHE_RSA ServerKeyExchange message
+// TODO: Extend this implementation to support all curve types and all ServerKeyExchange messages
+// See more:
+// - TLSECC(https://datatracker.ietf.org/doc/html/rfc4492)
+// - TLS 1.2(https://datatracker.ietf.org/doc/html/rfc5246#section-7.4.3)
+// - https://datatracker.ietf.org/doc/html/rfc8422#section-5.4
+struct EcdheRsaServerKeyExchange : public BaseMessage {
+    // ECParameters
+    ECCurveType curve_type = NAMED_CURVE;
+    NamedCurve named_curve = NC_SECP256R1;
+
+    // ECPoint
+    uint8_t point_format = 0x04; // uncompressed
+    std::array<uint8_t, 32> x, y;
+
+    // Digitally-signed signature
+    HashAlgorithm hash;
+    SignatureAlgorithm signature;
+    std::vector<uint8_t> sign;
+
+    EcdheRsaServerKeyExchange() = default;
+    EcdheRsaServerKeyExchange(
+        ECCurveType curve_type,
+        NamedCurve named_curve,
+        uint8_t point_format,
+        std::array<uint8_t, 32> &&x,
+        std::array<uint8_t, 32> &&y,
+        HashAlgorithm hash,
+        SignatureAlgorithm signature,
+        std::vector<uint8_t> &&sign
+    );
+
+    ~EcdheRsaServerKeyExchange() = default;
+
+    static std::optional<EcdheRsaServerKeyExchange> parse(const std::string &raw);
     std::string serialize() const override;
 };
+
+/*
 struct ServerHelloDone : public BaseMessage {
     ~ServerHelloDone() {}
     static std::optional<ServerHelloDone> parse(const std::string &raw);
@@ -241,7 +319,8 @@ struct Finished : public BaseMessage {
 using HandshakeMsg = std::variant<
     ClientHello,
     ServerHello,
-    Certificate /*, ServerKeyExchange, ServerHelloDone, ClientKeyExchange, Finished */>;
+    Certificate,
+    EcdheRsaServerKeyExchange /*, ServerHelloDone, ClientKeyExchange, Finished */>;
 
 struct Handshake : public BaseMessage {
     HandshakeType handshake_type;
