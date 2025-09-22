@@ -424,27 +424,45 @@ std::string TLS12<SV_SERVER>::server_hello_done(std::string &&) {
 template<>
 std::string TLS12<SV_CLIENT>::client_key_exchange(std::string &&) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
-    client_key_exchange_message msg;
-    msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
-    msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-    // Fill with client's public key coordinates.
-    mpz2bnd(P_.x_, msg.x, msg.x + 32);
-    mpz2bnd(P_.y_, msg.y, msg.y + 32);
-    return accumulate(struct2str(msg));
+    std::array<uint8_t, 32> x, y;
+    mpz2bnd(P_.x_, x.begin(), x.end());
+    mpz2bnd(P_.y_, y.begin(), y.end());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::CLIENT_KEY_EXCHANGE,
+            tls::EcdheClientKeyExchange{
+                0x04,
+                std::move(x),
+                std::move(y),
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_SERVER>::client_key_exchange(std::string &&s) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
         return alert(2, 10);
+    if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (handshake->handshake_type != tls::CLIENT_KEY_EXCHANGE)
+            return alert(2, 10);
+        accumulate(s);
+        auto client_key_exchange = std::get<tls::EcdheClientKeyExchange>(handshake->message);
+        const ECPoint Y{
+            bnd2mpz(client_key_exchange.x.begin(), client_key_exchange.x.end()),
+            bnd2mpz(client_key_exchange.y.begin(), client_key_exchange.y.end()),
+            secp256r1_
+        };
+        // Compute shared key.
+        derive_keys((prv_key_ * Y).x_);
+        return "";
     }
-    accumulate(s);
-    auto p = reinterpret_cast<client_key_exchange_message *>(s.data());
-    const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
-    // Compute shared key.
-    derive_keys((prv_key_ * Y).x_);
-    return "";
+    return alert(2, 10);
 }
 
 template<bool SV>

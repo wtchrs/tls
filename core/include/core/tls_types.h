@@ -260,7 +260,7 @@ struct Certificate : public BaseMessage {
     std::string serialize() const override;
 };
 
-// Currently implemented ECDHE_RSA ServerKeyExchange message
+// Currently implemented ECDHE_RSA NamedCurve Uncompressed format ServerKeyExchange message
 // TODO: Extend this implementation to support all curve types and all ServerKeyExchange messages
 // See more:
 // - TLSECC(https://datatracker.ietf.org/doc/html/rfc4492)
@@ -306,12 +306,20 @@ struct ServerHelloDone : public BaseMessage {
     std::string serialize() const override;
 };
 
-/*
-struct ClientKeyExchange : public BaseMessage {
-    ~ClientKeyExchange() {}
-    static std::optional<ClientKeyExchange> parse(const std::string &raw);
+struct EcdheClientKeyExchange : public BaseMessage {
+    uint8_t point_format = 0x04; // uncompressed
+    std::array<uint8_t, 32> x, y;
+
+    EcdheClientKeyExchange() = default;
+    EcdheClientKeyExchange(uint8_t point_format, std::array<uint8_t, 32> &&x, std::array<uint8_t, 32> &&y);
+
+    ~EcdheClientKeyExchange() = default;
+
+    static std::optional<EcdheClientKeyExchange> parse(const std::string &raw);
     std::string serialize() const override;
 };
+
+/*
 struct Finished : public BaseMessage {
     ~Finished() {}
     static std::optional<Finished> parse(const std::string &raw);
@@ -324,7 +332,8 @@ using HandshakeMsg = std::variant<
     ServerHello,
     Certificate,
     EcdheRsaServerKeyExchange,
-    ServerHelloDone /*, ClientKeyExchange, Finished */>;
+    ServerHelloDone,
+    EcdheClientKeyExchange /*, Finished */>;
 
 struct Handshake : public BaseMessage {
     HandshakeType handshake_type;

@@ -28,8 +28,8 @@ const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::Ha
         {tls::CERTIFICATE, tls::Certificate::parse},
         {tls::SERVER_KEY_EXCHANGE, tls::EcdheRsaServerKeyExchange::parse},
         {tls::SERVER_DONE, tls::ServerHelloDone::parse},
+        {tls::CLIENT_KEY_EXCHANGE, tls::EcdheClientKeyExchange::parse},
         /*
-        {tls::CLIENT_KEY_EXCHANGE, tls::ClientKeyExchange::parse},
         {tls::FINISHED, tls::Finished::parse},
         */
     };
@@ -348,6 +348,34 @@ std::optional<ServerHelloDone> ServerHelloDone::parse(const std::string &raw) {
 
 std::string ServerHelloDone::serialize() const {
     return "";
+}
+
+EcdheClientKeyExchange::EcdheClientKeyExchange(
+    uint8_t point_format, std::array<uint8_t, 32> &&x, std::array<uint8_t, 32> &&y
+)
+    : point_format{point_format}
+    , x{std::move(x)}
+    , y{std::move(y)} {}
+
+std::optional<EcdheClientKeyExchange> EcdheClientKeyExchange::parse(const std::string &raw) {
+    EcdheClientKeyExchange client_key_exchange;
+    size_t point_len = static_cast<uint8_t>(raw[0]);
+    if (point_len != 65)
+        return std::nullopt;
+    client_key_exchange.point_format = static_cast<uint8_t>(raw[1]);
+    std::copy_n(&raw[2], 32, client_key_exchange.x.begin());
+    std::copy_n(&raw[34], 32, client_key_exchange.y.begin());
+    return client_key_exchange;
+}
+
+std::string EcdheClientKeyExchange::serialize() const {
+    std::string msg;
+    auto point_len = 1 + this->x.size() + this->y.size();
+    msg.append(1, point_len);
+    msg.append(1, this->point_format);
+    msg.append(this->x.begin(), this->x.end());
+    msg.append(this->y.begin(), this->y.end());
+    return msg;
 }
 
 
