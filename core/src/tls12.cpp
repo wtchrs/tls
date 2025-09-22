@@ -266,6 +266,7 @@ void TLS12<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) 
     *--ptr = 0x00;
     // Add padding
     std::fill(padded + 2, ptr, 0xff);
+    padded[0] = 0x00;
     padded[1] = 0x01;
 
     // Sign with RSA.
@@ -306,6 +307,12 @@ std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
             return alert(2, 10);
         accumulate(s);
         auto server_key_exchange = std::get<tls::EcdheRsaServerKeyExchange>(msg->message);
+        if (server_key_exchange.curve_type != tls::NAMED_CURVE ||
+            server_key_exchange.named_curve != tls::NC_SECP256R1 || server_key_exchange.point_format != 0x04) {
+            spdlog::error("server_key_exchange:client: Unsupported curve type, named curve, or point format.");
+            return alert(2, 47); // illegal parameter
+        }
+
         // Extract server's ephemeral public key from received message.
         const ECPoint Y{
             bnd2mpz(server_key_exchange.x.begin(), server_key_exchange.x.end()),
@@ -352,21 +359,10 @@ std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
 
 template<>
 std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
-    /*
-    server_key_exchange_message msg;
-    msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
-    msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-    msg.handshake.handshake_type = SERVER_KEY_EXCHANGE;
-    mpz2bnd(P_.x_, msg.x, msg.x + 32);
-    mpz2bnd(P_.y_, msg.y, msg.y + 32);
-    generate_signature(&msg.named_curve, msg.sign);
-    return accumulate(struct2str(msg));
-    */
-
-    // FIX: Failed TLS 1.2 handshake test intermittently.
     std::array<uint8_t, 32> x, y;
     mpz2bnd(P_.x_, x.begin(), x.end());
     mpz2bnd(P_.y_, y.begin(), y.end());
+
     std::vector<uint8_t> sign(RSA_SIG_SIZE), pub_key;
     pub_key.push_back(tls::NAMED_CURVE);
     pub_key.push_back(tls::NC_SECP256R1 >> 8);
@@ -377,6 +373,7 @@ std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
     pub_key.insert(pub_key.end(), x.begin(), x.end());
     pub_key.insert(pub_key.end(), y.begin(), y.end());
     generate_signature(pub_key.data(), sign.data());
+
     tls::Record record{
         tls::HANDSHAKE,
         tls::TLS_VERSION_12,
@@ -399,11 +396,23 @@ std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
 
 template<>
 std::string TLS12<SV_CLIENT>::server_hello_done(std::string &&s) {
+    /*
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
         return alert(2, 10);
     }
     accumulate(s);
     return "";
+    */
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(2, 10);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::SERVER_DONE)
+            return alert(2, 10);
+        accumulate(s);
+        return "";
+    }
+    return alert(2, 10);
 }
 
 template<>
