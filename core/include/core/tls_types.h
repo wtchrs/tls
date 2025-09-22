@@ -281,6 +281,7 @@ struct EcdheRsaServerKeyExchange : public BaseMessage {
     std::vector<uint8_t> sign;
 
     EcdheRsaServerKeyExchange() = default;
+
     EcdheRsaServerKeyExchange(
         ECCurveType curve_type,
         NamedCurve named_curve,
@@ -298,12 +299,14 @@ struct EcdheRsaServerKeyExchange : public BaseMessage {
     std::string serialize() const override;
 };
 
-/*
 struct ServerHelloDone : public BaseMessage {
-    ~ServerHelloDone() {}
+    ~ServerHelloDone() = default;
+
     static std::optional<ServerHelloDone> parse(const std::string &raw);
     std::string serialize() const override;
 };
+
+/*
 struct ClientKeyExchange : public BaseMessage {
     ~ClientKeyExchange() {}
     static std::optional<ClientKeyExchange> parse(const std::string &raw);
@@ -320,7 +323,8 @@ using HandshakeMsg = std::variant<
     ClientHello,
     ServerHello,
     Certificate,
-    EcdheRsaServerKeyExchange /*, ServerHelloDone, ClientKeyExchange, Finished */>;
+    EcdheRsaServerKeyExchange,
+    ServerHelloDone /*, ClientKeyExchange, Finished */>;
 
 struct Handshake : public BaseMessage {
     HandshakeType handshake_type;

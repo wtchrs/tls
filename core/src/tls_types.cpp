@@ -27,8 +27,8 @@ const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::Ha
         {tls::SERVER_HELLO, tls::ServerHello::parse},
         {tls::CERTIFICATE, tls::Certificate::parse},
         {tls::SERVER_KEY_EXCHANGE, tls::EcdheRsaServerKeyExchange::parse},
+        {tls::SERVER_DONE, tls::ServerHelloDone::parse},
         /*
-        {tls::SERVER_HELLO_DONE, tls::ServerHelloDone::parse},
         {tls::CLIENT_KEY_EXCHANGE, tls::ClientKeyExchange::parse},
         {tls::FINISHED, tls::Finished::parse},
         */
@@ -338,6 +338,16 @@ std::string EcdheRsaServerKeyExchange::serialize() const {
     msg.append(1, sign_len);
     msg.append(this->sign.begin(), this->sign.end());
     return msg;
+}
+
+std::optional<ServerHelloDone> ServerHelloDone::parse(const std::string &raw) {
+    if (!raw.empty())
+        return std::nullopt;
+    return ServerHelloDone{};
+}
+
+std::string ServerHelloDone::serialize() const {
+    return "";
 }
 
 

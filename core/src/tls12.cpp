@@ -396,13 +396,6 @@ std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
 
 template<>
 std::string TLS12<SV_CLIENT>::server_hello_done(std::string &&s) {
-    /*
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
-        return alert(2, 10);
-    }
-    accumulate(s);
-    return "";
-    */
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
         return alert(2, 10);
@@ -417,8 +410,15 @@ std::string TLS12<SV_CLIENT>::server_hello_done(std::string &&s) {
 
 template<>
 std::string TLS12<SV_SERVER>::server_hello_done(std::string &&) {
-    constexpr server_hello_done_message msg;
-    return accumulate(struct2str(msg));
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::SERVER_DONE,
+            tls::ServerHelloDone{},
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
