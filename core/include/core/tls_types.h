@@ -319,13 +319,18 @@ struct EcdheClientKeyExchange : public BaseMessage {
     std::string serialize() const override;
 };
 
-/*
 struct Finished : public BaseMessage {
-    ~Finished() {}
+    std::array<uint8_t, 12> verify_data;
+
+    Finished() = default;
+    Finished(std::array<uint8_t, 12> &&verify_data);
+    Finished(const std::vector<uint8_t> &data);
+
+    ~Finished() = default;
+
     static std::optional<Finished> parse(const std::string &raw);
     std::string serialize() const override;
 };
-*/
 
 using HandshakeMsg = std::variant<
     ClientHello,
@@ -333,7 +338,8 @@ using HandshakeMsg = std::variant<
     Certificate,
     EcdheRsaServerKeyExchange,
     ServerHelloDone,
-    EcdheClientKeyExchange /*, Finished */>;
+    EcdheClientKeyExchange,
+    Finished>;
 
 struct Handshake : public BaseMessage {
     HandshakeType handshake_type;

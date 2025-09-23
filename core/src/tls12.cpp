@@ -487,20 +487,16 @@ std::string TLS12<SV>::finished(std::string &&s) {
     prf.secret(master_secret_.cbegin(), master_secret_.cend());
     const auto hash = sha.hash(accumulated_handshakes_.cbegin(), accumulated_handshakes_.cend());
     prf.seed(hash.cbegin(), hash.cend());
-    const char *label[2] = {"client finished", "server finished"};
-    prf.label(label[s.empty() ? SV : !SV]);
+    const char *finished_label[2] = {"client finished", "server finished"};
+    prf.label(finished_label[s.empty() ? SV : !SV]);
     const auto v = prf.get_n_bytes(12);
 
-    handshake_header handshake;
-    handshake.handshake_type = FINISHED;
-    handshake.set_length(12);
-
-    std::string msg = struct2str(handshake) + std::string{v.cbegin(), v.cend()};
+    auto msg = tls::Handshake{tls::FINISHED, tls::Finished{v}}.serialize();
     accumulated_handshakes_ += msg;
 
     if (s.empty()) {
         // Send FINISHED message.
-        return encode(std::move(msg), HANDSHAKE);
+        return encode(std::move(msg), tls::HANDSHAKE);
     }
 
     // Verify received message.

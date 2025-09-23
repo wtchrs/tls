@@ -378,6 +378,26 @@ std::string EcdheClientKeyExchange::serialize() const {
     return msg;
 }
 
+Finished::Finished(std::array<uint8_t, 12> &&verify_data)
+    : verify_data{std::move(verify_data)} {}
+
+Finished::Finished(const std::vector<uint8_t> &data)
+    : verify_data{} {
+    std::copy_n(data.begin(), 12, this->verify_data.begin());
+}
+
+std::optional<Finished> Finished::parse(const std::string &raw) {
+    Finished finished;
+    if (raw.length() != 12)
+        return std::nullopt;
+    std::copy(raw.begin(), raw.end(), finished.verify_data.begin());
+    return finished;
+}
+
+std::string Finished::serialize() const {
+    return std::string{this->verify_data.begin(), this->verify_data.end()};
+}
+
 
 /***** Extension Messages *****/
 
