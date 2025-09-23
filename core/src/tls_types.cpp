@@ -9,16 +9,11 @@
 #include <variant>
 
 
-const std::unordered_map< tls::ExtensionType, std::function<std::optional<tls::ExtensionMsg>(const std::string &)>>
-    extension_parsing_handlers{
-        {tls::SUPPORTED_GROUPS, tls::SupportedGroups::parse},
-        /*
-        {tls::EC_POINT_FORMATS, tls::ECPointFormats::parse},
-        {tls::KEY_SHARE, tls::KeyShare::parse},
-        {tls::SUPPORTED_VERSIONS, tls::SupportedVersions::parse},
-        {tls::PSK_KEY_EXCHANGE_MODES, tls::PskMode::parse},
-        {tls::SIGNATURE_ALGORITHMS, tls::SignatureAlgorithms::parse},
-        */
+const std::unordered_map<tls::ContentType, std::function<std::optional<tls::Msg>(const std::string &)>>
+    message_parsing_handlers{
+        // TODO: Add handlers for tls::ALERT, tls::APPLICATION_DATA
+        {tls::CHANGE_CIPHER_SPEC, tls::ChangeCipherSpec::parse},
+        {tls::HANDSHAKE, tls::Handshake::parse},
     };
 
 const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::HandshakeMsg>(const std::string &)>>
@@ -29,8 +24,18 @@ const std::unordered_map<tls::HandshakeType, std::function<std::optional<tls::Ha
         {tls::SERVER_KEY_EXCHANGE, tls::EcdheRsaServerKeyExchange::parse},
         {tls::SERVER_DONE, tls::ServerHelloDone::parse},
         {tls::CLIENT_KEY_EXCHANGE, tls::EcdheClientKeyExchange::parse},
-        /*
         {tls::FINISHED, tls::Finished::parse},
+    };
+
+const std::unordered_map< tls::ExtensionType, std::function<std::optional<tls::ExtensionMsg>(const std::string &)>>
+    extension_parsing_handlers{
+        {tls::SUPPORTED_GROUPS, tls::SupportedGroups::parse},
+        /*
+        {tls::EC_POINT_FORMATS, tls::ECPointFormats::parse},
+        {tls::KEY_SHARE, tls::KeyShare::parse},
+        {tls::SUPPORTED_VERSIONS, tls::SupportedVersions::parse},
+        {tls::PSK_KEY_EXCHANGE_MODES, tls::PskMode::parse},
+        {tls::SIGNATURE_ALGORITHMS, tls::SignatureAlgorithms::parse},
         */
     };
 
@@ -61,19 +66,14 @@ std::optional<Record> Record::parse(const std::string &raw) {
     size_t length = (static_cast<uint8_t>(raw[3]) << 8) + static_cast<uint8_t>(raw[4]);
     auto subraw = raw.substr(5, 5 + length);
 
-    switch (rec.content_type) {
-    // TODO: Implement each cases.
-    case APPLICATION_DATA: break;
-    case HANDSHAKE: {
-        auto msg = Handshake::parse(subraw);
-        if (!msg)
-            return std::nullopt;
-        rec.messages.push_back(*msg);
-        break;
-    }
-    case CHANGE_CIPHER_SPEC: break;
-    case ALERT: break;
-    }
+    // TODO: TLS 1.3 Record Coalescing
+    const auto &handler = message_parsing_handlers.find(rec.content_type);
+    if (handler == message_parsing_handlers.end())
+        return std::nullopt;
+    auto res = handler->second(subraw);
+    if (!res)
+        return std::nullopt;
+    rec.messages.push_back(*res);
 
     return rec;
 }
@@ -126,6 +126,22 @@ std::string Handshake::serialize() const {
     r.append(1, static_cast<char>(message_length));
     return r + message;
 }
+
+
+ChangeCipherSpec::ChangeCipherSpec(ChangeCipherSpecType type)
+    : type{type} {}
+
+std::optional<ChangeCipherSpec> ChangeCipherSpec::parse(const std::string &raw) {
+    auto type = static_cast<ChangeCipherSpec::ChangeCipherSpecType>(static_cast<uint8_t>(raw[0]));
+    return ChangeCipherSpec{type};
+}
+
+std::string ChangeCipherSpec::serialize() const {
+    std::string msg;
+    msg.append(1, this->type);
+    return msg;
+}
+
 
 /***** Handshake Messages *****/
 

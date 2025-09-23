@@ -355,9 +355,24 @@ struct Handshake : public BaseMessage {
     std::string serialize() const override;
 };
 
+struct ChangeCipherSpec : public BaseMessage {
+    enum ChangeCipherSpecType : uint8_t {
+        CHANGE_CIPHER_SPEC = 1,
+    };
+
+    ChangeCipherSpecType type = CHANGE_CIPHER_SPEC;
+
+    ChangeCipherSpec() = default;
+    ChangeCipherSpec(ChangeCipherSpecType type);
+    ~ChangeCipherSpec() = default;
+
+    static std::optional<ChangeCipherSpec> parse(const std::string &raw);
+    std::string serialize() const override;
+};
+
 
 // TODO: Add other types.
-using Msg = std::variant<Handshake>;
+using Msg = std::variant<Handshake, ChangeCipherSpec>;
 
 struct Record : public BaseMessage {
     ContentType content_type;

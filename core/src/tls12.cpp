@@ -469,12 +469,20 @@ template<bool SV>
 std::string TLS12<SV>::change_cipher_spec(std::string &&s) {
     if (s.empty()) {
         // send CHANGE_CIPHER_SPEC message
-        change_cipher_spec_message msg;
-        msg.tls.set_length(1);
-        return struct2str(msg);
+        tls::Record record{
+            tls::CHANGE_CIPHER_SPEC,
+            tls::TLS_VERSION_12,
+            {tls::ChangeCipherSpec{tls::ChangeCipherSpec::CHANGE_CIPHER_SPEC}},
+        };
+        return record.serialize();
     }
     // receive CHANGE_CIPHER_SPEC message
-    if (get_content_type(s).first != CHANGE_CIPHER_SPEC) {
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::CHANGE_CIPHER_SPEC || res->version != tls::TLS_VERSION_12 ||
+        res->messages.empty()) {
+        return alert(2, 10);
+    }
+    if (std::get<tls::ChangeCipherSpec>(res->messages[0]).type != tls::ChangeCipherSpec::CHANGE_CIPHER_SPEC) {
         return alert(2, 10);
     }
     return "";
