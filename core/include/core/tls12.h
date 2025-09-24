@@ -86,7 +86,7 @@ public:
      * @param type The content type of the message
      * @return The encoded message
      */
-    std::string encode(std::string &&s = "", int type = 0x17);
+    std::string encode(std::string &&s = "", tls::ContentType type = tls::APPLICATION_DATA);
 
     // ========== FOR HANDSHAKE ==========
 

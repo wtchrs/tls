@@ -17,6 +17,7 @@
 #include "core/sha/sha2.h"
 #include "core/tls12.h"
 #include "core/tls12_types.h"
+#include "core/tls_types.h"
 #include "core/utils.h"
 
 
@@ -300,7 +301,7 @@ std::optional<std::string> TLS13<SV>::decode(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS13<SV>::encode(std::string &&s, int type) {
+std::string TLS13<SV>::encode(std::string &&s, tls::ContentType type) {
     if (shared_secret_)
         return encode13(std::move(s), type);
     return TLS12<SV>::encode(std::move(s), type);

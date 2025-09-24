@@ -159,6 +159,16 @@ public:
     void set_aad(const unsigned char *p, size_t len);
 
     /**
+     * @brief Sets the additional authenticated data (AAD) for GCM mode.
+     *
+     * This function is used to set the additional authenticated data (AAD) for GCM mode.
+     * In TLS, sequence number and TLS header are used as the AAD.
+     *
+     * @param s AAD raw string.
+     */
+    void set_aad(const std::string &s);
+
+    /**
      * @brief Encrypts data in GCM mode.
      * @param[in,out] p Pointer to the data to encrypt. The encrypted data overwrites the original data.
      * @param len Length of the data to encrypt.
@@ -228,6 +238,15 @@ void GCM<Cipher>::xor_with_iv(const unsigned char *p) {
 template<CIPHER Cipher>
 void GCM<Cipher>::set_aad(const unsigned char *p, const size_t len) {
     aad_ = std::vector<unsigned char>{p, p + len};
+    // Write the length of aad to the front of len_ac in big-endian format
+    mpz2bnd(static_cast<unsigned long>(aad_.size() * 8), len_ac_, len_ac_ + 8);
+    while (aad_.size() % 16)
+        aad_.push_back(0);
+}
+
+template<CIPHER Cipher>
+void GCM<Cipher>::set_aad(const std::string &s) {
+    aad_ = std::vector<unsigned char>{s.begin(), s.end()};
     // Write the length of aad to the front of len_ac in big-endian format
     mpz2bnd(static_cast<unsigned long>(aad_.size() * 8), len_ac_, len_ac_ + 8);
     while (aad_.size() % 16)

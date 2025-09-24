@@ -12,6 +12,7 @@
 #include "core/hkdf.h"
 #include "core/sha/sha2.h"
 #include "core/tls12.h"
+#include "core/tls_types.h"
 
 /**
  * @brief A template class implementing the TLS 1.3 protocol.
@@ -157,7 +158,7 @@ public:
      * @param type The content type of the message.
      * @return The encrypted TLS record.
      */
-    std::string encode(std::string &&s, int type = 23);
+    std::string encode(std::string &&s, tls::ContentType type = tls::APPLICATION_DATA);
 
 protected:
     /**

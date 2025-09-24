@@ -1,4 +1,5 @@
 #include "protocol/tls13_layer.h"
+#include "core/tls_types.h"
 #include "protocol/layer.h"
 #include "protocol/tls12_layer.h"
 
@@ -60,7 +61,7 @@ bool TLS13LayerServer::handshake() {
     t += tls.server_certificate13();
     t += tls.certificate_verify();
     t += tls.finished();
-    s += tls.encode(std::move(t), HANDSHAKE);
+    s += tls.encode(std::move(t), tls::HANDSHAKE);
     FramedReceive::send(s);
 
     s = tls.alert(2, 0);

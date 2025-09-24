@@ -370,9 +370,36 @@ struct ChangeCipherSpec : public BaseMessage {
     std::string serialize() const override;
 };
 
+/** Struct for AES-GSM Additional Authenticated Data */
+struct AAD : BaseMessage {
+    std::array<uint8_t, 8> seq;
+    ContentType content_type;
+    ProtocolVersion version;
+    uint16_t length;
 
-// TODO: Add other types.
-using Msg = std::variant<Handshake, ChangeCipherSpec>;
+    AAD() = default;
+    AAD(std::array<uint8_t, 8> seq, ContentType content_type, ProtocolVersion version, uint16_t length);
+    ~AAD() = default;
+
+    std::string serialize() const override;
+};
+
+struct EncodedMessage : public BaseMessage {
+    std::array<uint8_t, 8> iv;
+    std::string data;
+    std::array<uint8_t, 16> auth_tag;
+
+    EncodedMessage() = default;
+    EncodedMessage(std::array<uint8_t, 8> &&iv, std::string &&data, std::array<uint8_t, 16> &&auth_tag);
+
+    ~EncodedMessage() = default;
+
+    static std::optional<EncodedMessage> parse(const std::string &raw);
+    std::string serialize() const override;
+};
+
+// TODO: Add Alert message
+using Msg = std::variant<Handshake, ChangeCipherSpec, EncodedMessage>;
 
 struct Record : public BaseMessage {
     ContentType content_type;
@@ -386,7 +413,7 @@ struct Record : public BaseMessage {
 
     ~Record() {}
 
-    static std::optional<Record> parse(const std::string &raw);
+    static std::optional<Record> parse(const std::string &raw, bool encoded = false);
     std::string serialize() const override;
 };
 

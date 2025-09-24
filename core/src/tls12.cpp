@@ -68,51 +68,50 @@ std::pair<int, int> TLS12<SV>::get_content_type(const std::string &s) {
 
 template<bool SV>
 std::optional<std::string> TLS12<SV>::decode(std::string &&s) {
-    const auto p = reinterpret_cast<received_message *>(s.data());
-    auth_tag_data tag_data;
-    if (const int type = get_content_type(s).first; type != HANDSHAKE && type != APPLICATION_DATA) {
+    auto res = tls::Record::parse(s, true);
+    if (!res || (res->content_type != tls::HANDSHAKE && res->content_type != tls::APPLICATION_DATA))
         return std::nullopt;
-    }
-    // Increase sequence number after filling tag_data.seq.
-    mpz2bnd(dec_seq_num_++, tag_data.seq, tag_data.seq + 8);
-    tag_data.tls = p->tls;
-    const auto msg_len = p->tls.get_length() - sizeof(received_message::iv) - 16; // except iv and tag length
-    tag_data.tls.set_length(msg_len);
-    const auto *aad = reinterpret_cast<uint8_t *>(&tag_data);
-    aes_[!SV].set_aad(aad, sizeof(tag_data));
-    aes_[!SV].set_iv(p->iv, 4, 8);
+    auto encoded_msg = std::get<tls::EncodedMessage>(res->messages[0]);
 
-    auto auth = aes_[!SV].decrypt(p->m, msg_len);
-    if (!std::equal(auth.begin(), auth.end(), p->m + msg_len)) {
+    // Increase sequence number after filling tag_data.seq.
+    std::array<uint8_t, 8> seq{};
+    mpz2bnd(dec_seq_num_++, seq.begin(), seq.end());
+
+    auto msg_len = encoded_msg.data.length();
+    tls::AAD aad{seq, res->content_type, res->version, static_cast<uint16_t>(msg_len)};
+
+    aes_[!SV].set_aad(aad.serialize());
+    aes_[!SV].set_iv(encoded_msg.iv.begin(), 4, 8);
+
+    auto auth = aes_[!SV].decrypt(reinterpret_cast<unsigned char *>(encoded_msg.data.data()), msg_len);
+    if (!std::equal(auth.begin(), auth.end(), encoded_msg.auth_tag.begin())) {
         // Failed to check authentication tag
         return std::nullopt;
     }
-    return std::string{p->m, p->m + msg_len};
+    return std::move(encoded_msg.data);
 }
 
 template<bool SV>
-std::string TLS12<SV>::encode(std::string &&s, const int type) {
+std::string TLS12<SV>::encode(std::string &&s, const tls::ContentType type) {
     // GCM-based encoding
-    send_message_header header;
-    auth_tag_data tag_data;
-    tag_data.tls.content_type = header.tls.content_type = type;
+    constexpr size_t CHUNK_SIZE = (1 << 14) - 64; // Maximum length for a chunk.
+    const size_t len = std::min(s.size(), CHUNK_SIZE);
+
+    std::array<uint8_t, 8> iv{};
+    mpz2bnd(random_prime(8), iv.begin(), iv.end());
+    aes_[SV].set_iv(iv.begin(), 4, 8);
 
     // Increase sequence number after filling tag_data.seq.
-    mpz2bnd(enc_seq_num_++, tag_data.seq, tag_data.seq + 8);
-    constexpr size_t CHUNK_SIZE = (1 << 14) - 64; // Maximum length for one packet.
-    const size_t len = std::min(s.size(), CHUNK_SIZE);
-    tag_data.tls.set_length(len);
+    std::array<uint8_t, 8> seq{};
+    mpz2bnd(enc_seq_num_++, seq.begin(), seq.end());
+    tls::AAD aad{seq, type, tls::TLS_VERSION_12, static_cast<uint16_t>(len)};
+    aes_[SV].set_aad(aad.serialize());
+
     std::string frag = s.substr(0, len);
+    auto tag = aes_[SV].encrypt(reinterpret_cast<unsigned char *>(frag.data()), frag.size());
 
-    mpz2bnd(random_prime(8), header.iv, header.iv + 8);
-    aes_[SV].set_iv(header.iv, 4, 8);
-    const auto *aad = reinterpret_cast<uint8_t *>(&tag_data);
-    aes_[SV].set_aad(aad, sizeof(tag_data));
-
-    const auto tag = aes_[SV].encrypt(reinterpret_cast<unsigned char *>(frag.data()), frag.size());
-    frag += std::string{tag.cbegin(), tag.cend()}; // Attach auth tag
-    header.tls.set_length(sizeof(header.iv) + frag.size());
-    std::string r = struct2str(header) + frag;
+    tls::Record rec{type, tls::TLS_VERSION_12, {tls::EncodedMessage{std::move(iv), std::move(frag), std::move(tag)}}};
+    auto r = rec.serialize();
 
     if (s.size() > CHUNK_SIZE) {
         // Encode recursively if the message is long.

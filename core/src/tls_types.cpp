@@ -58,13 +58,21 @@ Record::Record(ContentType content_type, ProtocolVersion protocol_version, std::
     , version{protocol_version}
     , messages{messages} {}
 
-std::optional<Record> Record::parse(const std::string &raw) {
+std::optional<Record> Record::parse(const std::string &raw, bool encoded) {
     Record rec;
     rec.content_type = static_cast<ContentType>(static_cast<uint8_t>(raw[0]));
     auto ver = (static_cast<uint8_t>(raw[1]) << 8) + static_cast<uint8_t>(raw[2]);
     rec.version = static_cast<ProtocolVersion>(ver);
     size_t length = (static_cast<uint8_t>(raw[3]) << 8) + static_cast<uint8_t>(raw[4]);
     auto subraw = raw.substr(5, 5 + length);
+
+    if (encoded) {
+        auto res = EncodedMessage::parse(subraw);
+        if (!res)
+            return std::nullopt;
+        rec.messages.push_back(*res);
+        return rec;
+    }
 
     // TODO: TLS 1.3 Record Coalescing
     const auto &handler = message_parsing_handlers.find(rec.content_type);
@@ -140,6 +148,42 @@ std::string ChangeCipherSpec::serialize() const {
     std::string msg;
     msg.append(1, this->type);
     return msg;
+}
+
+AAD::AAD(std::array<uint8_t, 8> seq, ContentType content_type, ProtocolVersion version, uint16_t length)
+    : seq{std::move(seq)}
+    , content_type{content_type}
+    , version{version}
+    , length{length} {}
+
+std::string AAD::serialize() const {
+    std::string res{this->seq.begin(), this->seq.end()};
+    res.append(1, this->content_type);
+    res.append(1, this->version >> 8);
+    res.append(1, this->version);
+    res.append(1, this->length >> 8);
+    res.append(1, this->length);
+    return res;
+}
+
+EncodedMessage::EncodedMessage(std::array<uint8_t, 8> &&iv, std::string &&data, std::array<uint8_t, 16> &&auth_tag)
+    : iv{std::move(iv)}
+    , data{std::move(data)}
+    , auth_tag{std::move(auth_tag)} {}
+
+std::optional<EncodedMessage> EncodedMessage::parse(const std::string &raw) {
+    EncodedMessage msg;
+    std::copy_n(raw.begin(), 8, msg.iv.begin());
+    msg.data = raw.substr(8, raw.length() - 24);
+    std::copy_n(raw.end() - 16, 16, msg.auth_tag.begin());
+    return msg;
+}
+
+std::string EncodedMessage::serialize() const {
+    std::string res{this->iv.begin(), this->iv.end()};
+    res.append(this->data);
+    res.append(this->auth_tag.begin(), this->auth_tag.end());
+    return res;
 }
 
 
