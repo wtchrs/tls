@@ -64,7 +64,7 @@ std::optional<Record> Record::parse(const std::string &raw, bool encoded) {
     auto ver = (static_cast<uint8_t>(raw[1]) << 8) + static_cast<uint8_t>(raw[2]);
     rec.version = static_cast<ProtocolVersion>(ver);
     size_t length = (static_cast<uint8_t>(raw[3]) << 8) + static_cast<uint8_t>(raw[4]);
-    auto subraw = raw.substr(5, 5 + length);
+    auto subraw = raw.substr(5, length);
 
     if (encoded) {
         auto res = EncodedMessage::parse(subraw);
@@ -111,7 +111,7 @@ std::optional<Handshake> Handshake::parse(const std::string &raw) {
     handshake.handshake_type = static_cast<HandshakeType>(static_cast<uint8_t>(raw[0]));
     size_t length =
         (static_cast<uint8_t>(raw[1]) << 16) + (static_cast<uint8_t>(raw[2]) << 8) + static_cast<uint8_t>(raw[3]);
-    auto subraw = raw.substr(4, 4 + length);
+    auto subraw = raw.substr(4, length);
 
     const auto &handler = handshake_parsing_handlers.find(handshake.handshake_type);
     if (handler == handshake_parsing_handlers.end())
@@ -319,7 +319,7 @@ std::optional<Certificate> Certificate::parse(const std::string &raw) {
     for (size_t pos = 3; pos < total_len;) {
         size_t len = (static_cast<uint8_t>(raw[pos]) << 16) + (static_cast<uint8_t>(raw[pos + 1]) << 8) +
                      static_cast<uint8_t>(raw[pos + 2]);
-        certificate.certificates.push_back(raw.substr(pos + 3, pos + 3 + len));
+        certificate.certificates.push_back(raw.substr(pos + 3, len));
         pos += len + 3;
     }
     return certificate;
@@ -472,7 +472,7 @@ std::optional<Extensions> Extensions::parse(const std::string &raw) {
         auto handler = extension_parsing_handlers.find(type);
         if (handler == extension_parsing_handlers.end())
             return std::nullopt;
-        auto res = handler->second(raw.substr(pos, pos + ext_length));
+        auto res = handler->second(raw.substr(pos, ext_length));
         if (!res)
             return std::nullopt;
         extensions.extensions.push_back(*res);
