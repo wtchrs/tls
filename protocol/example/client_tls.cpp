@@ -2,10 +2,11 @@
 #include <spdlog/spdlog.h>
 #include "protocol/connector.h"
 #include "protocol/layer.h"
+#include "protocol/tls12_layer.h"
 
 std::unique_ptr<Layer> https_layer_factory(int fd) {
     auto tcp = std::make_unique<TCPLayer>(fd);
-    auto tls = std::make_unique<TLS12Layer<SV_CLIENT>>(std::move(tcp));
+    auto tls = std::make_unique<TLS12LayerClient>(std::move(tcp));
     tls->handshake();
     auto http = std::make_unique<HTTPLayer>(std::move(tls));
     return http;

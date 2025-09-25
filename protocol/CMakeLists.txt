@@ -1,9 +1,4 @@
-file(GLOB_RECURSE SOURCES
-        src/acceptor.cpp
-        src/address_util.cpp
-        src/connector.cpp
-        src/layer.cpp
-)
+file(GLOB_RECURSE SOURCES src/*)
 
 add_library(protocol ${SOURCES})
 target_include_directories(protocol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

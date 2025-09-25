@@ -1,6 +1,11 @@
 #include "core/tls12.h"
 #include <algorithm>
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <condition_variable>
+#include <future>
+#include <mutex>
+#include <queue>
 #include <spdlog/spdlog.h>
 #include "aes_test.h"
 #include "core/aes.h"
@@ -101,7 +106,6 @@ TEST_CASE("Test TLS without other layer") {
     REQUIRE_MESSAGE(r.empty(), "Failed SERVER_CERTIFICATE: " << bytes_to_hex(r.cbegin(), r.cend()));
     spdlog::info("server_certificate - OK");
 
-    // TODO: Failed intermittently
     spdlog::info("server_key_exchange - START");
     r = client.server_key_exchange(server.server_key_exchange());
     REQUIRE_MESSAGE(r.empty(), "Failed SERVER_KEY_EXCHANGE: " << bytes_to_hex(r.cbegin(), r.cend()));
@@ -179,3 +183,99 @@ TEST_CASE("Test TLS without other layer") {
     REQUIRE_MESSAGE(opt_srv_msg.has_value(), "Client failed to decode server message. `opt_srv_msg` must have value.");
     REQUIRE_MESSAGE(*opt_srv_msg == std::string{"Hello, world!"}, "Client failed to decode server message.");
 }
+
+// TODO: Update test
+/*
+TEST_CASE("Test TLS Handshake") {
+    std::queue<std::string> to_server_q;
+    std::mutex to_server_m;
+    std::condition_variable to_server_cv;
+    std::atomic_bool client_is_done = false;
+
+    std::queue<std::string> to_client_q;
+    std::mutex to_client_m;
+    std::condition_variable to_client_cv;
+    std::atomic_bool server_is_done = false;
+
+    TLSTest<SV_SERVER> server{
+        [&]() -> std::optional<std::string> {
+            std::unique_lock<std::mutex> lk(to_server_m);
+            to_server_cv.wait(lk, [&] { return !to_server_q.empty() || client_is_done; });
+            spdlog::info("Acquire server mutex");
+            if (to_server_q.empty()) {
+                spdlog::info("Empty server queue");
+                return std::nullopt;
+            }
+            std::string s = std::move(to_server_q.front());
+            to_server_q.pop();
+            return s;
+        },
+        [&](std::string s) {
+            {
+                std::lock_guard<std::mutex> lk(to_client_m);
+                to_client_q.push(std::move(s));
+            }
+            to_client_cv.notify_one();
+        }
+    };
+    TLSTest<SV_CLIENT> client{
+        [&]() -> std::optional<std::string> {
+            std::unique_lock<std::mutex> lk(to_client_m);
+            to_client_cv.wait(lk, [&] { return !to_client_q.empty() || server_is_done; });
+            if (to_client_q.empty()) {
+                return std::nullopt;
+            }
+            std::string s = std::move(to_client_q.front());
+            to_client_q.pop();
+            return s;
+        },
+        [&](std::string s) {
+            {
+                std::lock_guard<std::mutex> lk(to_server_m);
+                to_server_q.push(std::move(s));
+            }
+            to_server_cv.notify_one();
+        }
+    };
+
+    auto server_task = [&]() -> bool {
+        bool ok = server.handshake();
+        server_is_done = true;
+        to_client_cv.notify_one();
+        return ok;
+    };
+
+    auto client_task = [&]() -> bool {
+        bool ok = client.handshake();
+        client_is_done = true;
+        to_server_cv.notify_one();
+        return ok;
+    };
+
+    auto server_future = std::async(std::launch::async, server_task);
+    auto client_future = std::async(std::launch::async, client_task);
+
+    bool server_ok = server_future.get();
+    bool client_ok = client_future.get();
+
+    REQUIRE(server_ok);
+    REQUIRE(client_ok);
+
+    // Post-handshake checks
+    REQUIRE_MESSAGE(
+        std::equal(
+            server.get_master_secret().begin(), server.get_master_secret().end(), client.get_master_secret().begin()
+        ),
+        "Server and client's master secrets are not equal."
+    );
+
+    // Application data
+    auto opt_cli_msg = server.decode(client.encode("hello world"));
+    REQUIRE(opt_cli_msg.has_value());
+    REQUIRE(*opt_cli_msg == "hello world");
+
+    auto opt_srv_msg = client.decode(server.encode("Hello, world!"));
+    REQUIRE(opt_srv_msg.has_value());
+    REQUIRE(*opt_srv_msg == "Hello, world!");
+}
+*/

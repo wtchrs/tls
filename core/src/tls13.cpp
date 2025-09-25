@@ -16,8 +16,7 @@
 #include "core/mpz.h"
 #include "core/sha/sha2.h"
 #include "core/tls12.h"
-#include "core/tls12_types.h"
-#include "core/tls_macros.h"
+#include "core/tls_types.h"
 #include "core/utils.h"
 
 
@@ -62,7 +61,7 @@ static mpz_class private_key = init_prv_key();
 template<>
 std::string TLS13<SV_SERVER>::client_hello(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     }
     size_t pos = 43; // starts from session id length position
     size_t session_id_len = s[pos];
@@ -113,113 +112,14 @@ std::string TLS13<SV_SERVER>::server_hello(std::string &&) {
 
 template<>
 std::string TLS13<SV_CLIENT>::server_hello(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
-        return alert(2, 10);
-    }
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO})
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     auto ext_ptr = reinterpret_cast<uint8_t *>(&s[79]);
     if (s.size() > 80 && server_ext(ext_ptr)) {
         accumulate(s);
         return "";
     }
     return TLS12<SV_CLIENT>::server_hello(std::move(s));
-}
-
-
-template<>
-bool TLS13<SV_SERVER>::handshake(
-    std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f
-) {
-    // server-side
-    std::string s;
-    std::optional<std::string> a;
-
-    EXPECT_RECEIVE(s, a, client_hello);
-
-    s = this->server_hello();
-
-    if (!shared_secret_) {
-        // TLS 1.2
-        return TLS12<SV_SERVER>::handshake_sub(read_f, write_f, std::move(s));
-    } else {
-        // TLS 1.3
-        protect_handshake();
-        s += this->change_cipher_spec(); // not necessary. dummy record for compatibility.
-        // Switched to Handshake Traffic Keys.
-        std::string t = encrypted_extension();
-        t += server_certificate13();
-        t += certificate_verify();
-        t += finished();
-        s += this->encode(std::move(t), HANDSHAKE);
-        write_f(s);
-
-        EXPECT_RECEIVE(s, a, this->change_cipher_spec);
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || !(a = this->decode(std::move(*a)))) {
-            goto error;
-        }
-        protect_data();
-        if ((s = finished(std::move(*a))) != "") {
-            goto error;
-        }
-
-        // Handshake finished. Switched to Application Traffic Keys.
-    }
-
-    return true;
-error:
-    write_f(s);
-    return false;
-}
-
-template<>
-bool TLS13<SV_CLIENT>::handshake(
-    std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f
-) {
-    // client-side
-    std::string s;
-    std::optional<std::string> a;
-
-    write_f(client_hello());
-
-    a = read_f();
-    if (!a || (s = server_hello(std::move(*a))) != "") {
-        goto error;
-    }
-
-    if (!shared_secret_) {
-        // TLS 1.2
-        return TLS12<SV_CLIENT>::handshake_sub(read_f, write_f, "");
-    } else {
-        // TLS 1.3
-        protect_handshake();
-
-        EXPECT_RECEIVE(s, a, this->change_cipher_spec);
-
-        s = this->alert(2, 0);
-        a = read_f();
-        if (!a || !(a = this->decode(std::move(*a)))) {
-            goto error;
-        }
-        // TODO: Why does not check received message?
-
-        // Switched to Handshake Traffic Keys.
-
-        this->accumulated_handshakes_ += *a;
-        std::string temp = this->accumulated_handshakes_;
-        s = this->change_cipher_spec(); // not necessary. dummy record for compatibility.
-        s += this->encode(finished());
-        write_f(std::move(s));
-        this->accumulated_handshakes_ = temp;
-        protect_data();
-        // Handshake finished. Switched to Application Traffic Keys.
-    }
-
-    return true;
-error:
-    write_f(s);
-    return false;
 }
 
 
@@ -313,11 +213,29 @@ std::string TLS13<SV>::finished(std::string &&s) {
     if (s == msg) {
         return "";
     }
-    return this->alert(2, 51);
+    return this->alert(tls::FATAL, tls::DECRYPT_ERROR);
 }
 
 
 #pragma pack(push, 1)
+
+struct TLS_header {
+    /** 0x15: Alert, 0x16: Handshake, 0x17: Application data */
+    uint8_t content_type = HANDSHAKE;
+    /** 0x0303 for TLS 1.2 */
+    uint8_t version[2] = {0x03, 0x03};
+    uint8_t length[2] = {0, 4};
+
+    void set_length(const size_t k) {
+        length[0] = k / 0x100;
+        length[1] = k % 0x100;
+    }
+
+    [[nodiscard]]
+    size_t get_length() const {
+        return length[0] * 0x100 + length[1];
+    }
+};
 
 struct EncryptedMessage {
     TLS_header tls;
@@ -331,7 +249,7 @@ std::optional<std::string> TLS13<SV>::decode13(std::string &&s) {
     EncryptedMessage *p = reinterpret_cast<EncryptedMessage *>(s.data());
     uint8_t seq[8] = {};
     if (int type = this->get_content_type(s).first; type != APPLICATION_DATA) {
-        this->alert(this->alert(2, 10));
+        this->alert(this->alert(tls::FATAL, tls::UNEXPECTED_MESSAGE));
         return {};
     }
     mpz2bnd(this->dec_seq_num_++, seq, seq + sizeof(seq));
@@ -349,7 +267,7 @@ std::optional<std::string> TLS13<SV>::decode13(std::string &&s) {
             r.pop_back();
         }
         if (r.back() == ALERT) {
-            this->alert(this->alert(r[0], r[1]));
+            this->alert(this->alert(static_cast<tls::AlertLevel>(r[0]), static_cast<tls::AlertDescription>(r[1])));
             return {};
         }
         r.pop_back();
@@ -357,7 +275,7 @@ std::optional<std::string> TLS13<SV>::decode13(std::string &&s) {
     }
 
     // failed (bad record mac)
-    this->alert(this->alert(2, 20));
+    this->alert(this->alert(tls::FATAL, tls::BAD_RECORD_MAC));
     return {};
 }
 
@@ -399,7 +317,7 @@ std::optional<std::string> TLS13<SV>::decode(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS13<SV>::encode(std::string &&s, int type) {
+std::string TLS13<SV>::encode(std::string &&s, tls::ContentType type) {
     if (shared_secret_)
         return encode13(std::move(s), type);
     return TLS12<SV>::encode(std::move(s), type);

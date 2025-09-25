@@ -1,19 +1,17 @@
-/** TLS 1.2 */
-
 #ifndef CORE_TLS12_H
 #define CORE_TLS12_H
 
 
-#include <cstdint>
-#include <functional>
 #include <gmpxx.h>
 #include <optional>
+#include <string>
 #include <utility>
 #include "core/aes.h"
 #include "core/cipher_mode.h"
 #include "core/diffie_hellman.h"
 #include "core/mpz.h"
 #include "core/rsa.h"
+#include "core/tls_types.h"
 
 #define SV_SERVER true
 #define SV_CLIENT false
@@ -52,7 +50,8 @@ protected:
     mpz_class prv_key_ = random_prime(31); ///< Private key for the curve
     ECPoint P_{prv_key_ * G_}; ///< Public key for the curve
 
-    std::array<unsigned char, 32> session_id_ = {}, server_random_ = {}, client_random_ = {};
+    std::array<unsigned char, 32> server_random_ = {}, client_random_ = {};
+    std::vector<unsigned char> session_id_{};
 
     /**
      * @brief Master secret for the session
@@ -62,7 +61,7 @@ protected:
     std::vector<unsigned char> master_secret_;
 
     std::string accumulated_handshakes_; ///< Accumulated handshake messages
-    static std::string certificate_; ///< Server certificate, read from file
+    static tls::Record certificate_; ///< Server certificate message, read from file
     static RSA rsa_; ///< Initialized with public key of the server certificate
 
 public:
@@ -86,17 +85,7 @@ public:
      * @param type The content type of the message
      * @return The encoded message
      */
-    std::string encode(std::string &&s = "", int type = 0x17);
-
-    /**
-     * @brief Performs the TLS 1.2 handshake.
-     * @param read_f A function to read data from the peer.
-     * @param write_f A function to write data to the peer.
-     * @return True if the handshake was successful, false otherwise.
-     */
-    bool handshake(
-        const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
-    );
+    std::string encode(std::string &&s = "", tls::ContentType type = tls::APPLICATION_DATA);
 
     // ========== FOR HANDSHAKE ==========
 
@@ -124,16 +113,12 @@ public:
      * @param desc The alert type as code
      * @return The alert message
      */
-    std::string alert(uint8_t level, uint8_t desc);
+    std::string alert(tls::AlertLevel level, tls::AlertDescription desc);
 
-protected:
     std::string accumulate(const std::string &s);
-
-    bool handshake_sub(
-        const std::function<std::optional<std::string>()> &read_f,
-        const std::function<void(std::string)> &write_f,
-        std::string waiting_msg
-    );
+    std::string accumulate_raw(const std::string &s);
+    void set_accumulate(const std::string &s);
+    std::string get_accumulate();
 
 private:
     void generate_signature(unsigned char *pub_key, unsigned char *sign) const;

@@ -5,7 +5,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <gmpxx.h>
 #include <optional>
 #include <string_view>
@@ -13,6 +12,7 @@
 #include "core/hkdf.h"
 #include "core/sha/sha2.h"
 #include "core/tls12.h"
+#include "core/tls_types.h"
 
 /**
  * @brief A template class implementing the TLS 1.3 protocol.
@@ -53,17 +53,30 @@ private:
     std::array<std::vector<uint8_t>, 2> finished_key_;
 
 public:
+    bool is_tls13() {
+        return shared_secret_ != 0;
+    }
     /**
      * @brief Performs the TLS 1.3 handshake.
      *
      * This method orchestrates the handshake process for both client and server,
      * handling the exchange of messages to establish a secure session.
      *
-     * @param read_f A function to read data from the peer.
-     * @param write_f A function to write data to the peer.
      * @return True if the handshake was successful, false otherwise.
      */
-    bool handshake(std::function<std::optional<std::string>()> &read_f, std::function<void(std::string)> &write_f);
+    bool handshake();
+
+    /**
+     * @brief Derives and sets the handshake traffic keys.
+     * This is called after the ServerHello message is processed.
+     */
+    void protect_handshake();
+
+    /**
+     * @brief Derives and sets the application traffic keys.
+     * This is called after the server's Finished message is processed.
+     */
+    void protect_data();
 
     /**
      * @brief Handles or generates a ClientHello message.
@@ -88,6 +101,12 @@ public:
      *         The generated ServerHello message (server mode).
      */
     std::string server_hello(std::string &&s = "");
+
+    /**
+     * @brief Generates the EncryptedExtensions message.
+     * @return The EncryptedExtensions message.
+     */
+    std::string encrypted_extension();
 
     /**
      * @brief Handles or generates a Finished message.
@@ -139,7 +158,7 @@ public:
      * @param type The content type of the message.
      * @return The encrypted TLS record.
      */
-    std::string encode(std::string &&s, int type = 23);
+    std::string encode(std::string &&s, tls::ContentType type = tls::APPLICATION_DATA);
 
 protected:
     /**
@@ -153,12 +172,6 @@ protected:
      * @return A string containing the serialized extensions.
      */
     std::string server_ext();
-
-    /**
-     * @brief Generates the EncryptedExtensions message.
-     * @return The EncryptedExtensions message.
-     */
-    std::string encrypted_extension();
 
     /**
      * @brief Parses extensions from a received ClientHello message.
@@ -175,18 +188,6 @@ protected:
     bool server_ext(unsigned char *p);
 
 private:
-    /**
-     * @brief Derives and sets the handshake traffic keys.
-     * This is called after the ServerHello message is processed.
-     */
-    void protect_handshake();
-
-    /**
-     * @brief Derives and sets the application traffic keys.
-     * This is called after the server's Finished message is processed.
-     */
-    void protect_data();
-
     /**
      * @brief Derives traffic secrets and expands them into AES-GCM keys and IVs.
      *

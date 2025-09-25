@@ -5,14 +5,12 @@
 #include <cstdint>
 #include <fstream>
 #include <gmpxx.h>
-#include <ios>
-#include <iostream>
 #include <optional>
-#include <ostream>
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 #include "core/base64.h"
 #include "core/cert.h"
@@ -22,26 +20,33 @@
 #include "core/prf.h"
 #include "core/rsa.h"
 #include "core/sha/sha2.h"
-#include "core/tls12_types.h"
-#include "core/tls_macros.h"
-#include "core/utils.h"
+#include "core/tls_types.h"
 
-std::string init_certificate() {
+
+#define RANDOM_SIZE 32
+#define PUBKEY_SIZE 69
+#define MESSAGE_TO_HASH_SIZE RANDOM_SIZE * 2 + PUBKEY_SIZE
+#define RSA_SIG_SIZE 256
+
+
+static tls::Record init_certificate_message() {
     std::ifstream cert_pem{"./cert/example/cert.pem"};
-    std::vector<unsigned char> r = {HANDSHAKE, 3, 3, 0, 0, CERTIFICATE, 0, 0, 0, 0, 0, 0};
+    std::vector<std::string> certificates;
     for (std::string s; !(s = get_certificate_core(cert_pem)).empty();) {
         auto v = base64_decode(s);
-        r.resize(r.size() + 3);
-        mpz2bnd(static_cast<int>(v.size()), r.end() - 3, r.end());
-        r.insert(r.end(), v.cbegin(), v.cend());
+        certificates.emplace_back(v.begin(), v.end());
     }
-    mpz2bnd(static_cast<int>(r.size() - 5), r.begin() + 3, r.begin() + 5); // size field of TLS header
-    mpz2bnd(static_cast<int>(r.size() - 9), r.begin() + 6, r.begin() + 9); // size field of TLS handshake header
-    mpz2bnd(static_cast<int>(r.size() - 12), r.begin() + 9, r.begin() + 12); // total size of certificates
-    return {r.cbegin(), r.cend()};
+    return tls::Record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::CERTIFICATE,
+            tls::Certificate{std::move(certificates)},
+        }}
+    };
 }
 
-RSA init_rsa() {
+static RSA init_rsa() {
     std::ifstream prv_pem{"./cert/example/key.pem"};
     if (!prv_pem.is_open()) {
         throw "Failed to open the private key PEM file.";
@@ -55,7 +60,7 @@ RSA init_rsa() {
 }
 
 template<bool SV>
-std::string TLS12<SV>::certificate_ = init_certificate();
+tls::Record TLS12<SV>::certificate_ = init_certificate_message();
 
 template<bool SV>
 RSA TLS12<SV>::rsa_ = init_rsa();
@@ -68,51 +73,50 @@ std::pair<int, int> TLS12<SV>::get_content_type(const std::string &s) {
 
 template<bool SV>
 std::optional<std::string> TLS12<SV>::decode(std::string &&s) {
-    const auto p = reinterpret_cast<received_message *>(s.data());
-    auth_tag_data tag_data;
-    if (const int type = get_content_type(s).first; type != HANDSHAKE && type != APPLICATION_DATA) {
+    auto res = tls::Record::parse(s, true);
+    if (!res || (res->content_type != tls::HANDSHAKE && res->content_type != tls::APPLICATION_DATA))
         return std::nullopt;
-    }
-    // Increase sequence number after filling tag_data.seq.
-    mpz2bnd(dec_seq_num_++, tag_data.seq, tag_data.seq + 8);
-    tag_data.tls = p->tls;
-    const auto msg_len = p->tls.get_length() - sizeof(received_message::iv) - 16; // except iv and tag length
-    tag_data.tls.set_length(msg_len);
-    const auto *aad = reinterpret_cast<uint8_t *>(&tag_data);
-    aes_[!SV].set_aad(aad, sizeof(tag_data));
-    aes_[!SV].set_iv(p->iv, 4, 8);
+    auto encoded_msg = std::get<tls::EncodedMessage>(res->messages[0]);
 
-    auto auth = aes_[!SV].decrypt(p->m, msg_len);
-    if (!std::equal(auth.begin(), auth.end(), p->m + msg_len)) {
+    // Increase sequence number after filling tag_data.seq.
+    std::array<uint8_t, 8> seq{};
+    mpz2bnd(dec_seq_num_++, seq.begin(), seq.end());
+
+    auto msg_len = encoded_msg.data.length();
+    tls::AAD aad{seq, res->content_type, res->version, static_cast<uint16_t>(msg_len)};
+
+    aes_[!SV].set_aad(aad.serialize());
+    aes_[!SV].set_iv(encoded_msg.iv.begin(), 4, 8);
+
+    auto auth = aes_[!SV].decrypt(reinterpret_cast<unsigned char *>(encoded_msg.data.data()), msg_len);
+    if (!std::equal(auth.begin(), auth.end(), encoded_msg.auth_tag.begin())) {
         // Failed to check authentication tag
         return std::nullopt;
     }
-    return std::string{p->m, p->m + msg_len};
+    return std::move(encoded_msg.data);
 }
 
 template<bool SV>
-std::string TLS12<SV>::encode(std::string &&s, const int type) {
+std::string TLS12<SV>::encode(std::string &&s, const tls::ContentType type) {
     // GCM-based encoding
-    send_message_header header;
-    auth_tag_data tag_data;
-    tag_data.tls.content_type = header.tls.content_type = type;
+    constexpr size_t CHUNK_SIZE = (1 << 14) - 64; // Maximum length for a chunk.
+    const size_t len = std::min(s.size(), CHUNK_SIZE);
+
+    std::array<uint8_t, 8> iv{};
+    mpz2bnd(random_prime(8), iv.begin(), iv.end());
+    aes_[SV].set_iv(iv.begin(), 4, 8);
 
     // Increase sequence number after filling tag_data.seq.
-    mpz2bnd(enc_seq_num_++, tag_data.seq, tag_data.seq + 8);
-    constexpr size_t CHUNK_SIZE = (1 << 14) - 64; // Maximum length for one packet.
-    const size_t len = std::min(s.size(), CHUNK_SIZE);
-    tag_data.tls.set_length(len);
+    std::array<uint8_t, 8> seq{};
+    mpz2bnd(enc_seq_num_++, seq.begin(), seq.end());
+    tls::AAD aad{seq, type, tls::TLS_VERSION_12, static_cast<uint16_t>(len)};
+    aes_[SV].set_aad(aad.serialize());
+
     std::string frag = s.substr(0, len);
+    auto tag = aes_[SV].encrypt(reinterpret_cast<unsigned char *>(frag.data()), frag.size());
 
-    mpz2bnd(random_prime(8), header.iv, header.iv + 8);
-    aes_[SV].set_iv(header.iv, 4, 8);
-    const auto *aad = reinterpret_cast<uint8_t *>(&tag_data);
-    aes_[SV].set_aad(aad, sizeof(tag_data));
-
-    const auto tag = aes_[SV].encrypt(reinterpret_cast<unsigned char *>(frag.data()), frag.size());
-    frag += std::string{tag.cbegin(), tag.cend()}; // Attach auth tag
-    header.tls.set_length(sizeof(header.iv) + frag.size());
-    std::string r = struct2str(header) + frag;
+    tls::Record rec{type, tls::TLS_VERSION_12, {tls::EncodedMessage{std::move(iv), std::move(frag), std::move(tag)}}};
+    auto r = rec.serialize();
 
     if (s.size() > CHUNK_SIZE) {
         // Encode recursively if the message is long.
@@ -125,90 +129,116 @@ std::string TLS12<SV>::encode(std::string &&s, const int type) {
 
 template<>
 std::string TLS12<SV_CLIENT>::client_hello(std::string &&) {
-    client_hello_message msg;
-    msg.tls.set_length(sizeof(msg) - sizeof(msg.tls));
-    msg.handshake.set_length(sizeof(msg) - sizeof(msg.tls) - sizeof(msg.handshake));
-    mpz2bnd(random_prime(32), msg.hello.random, msg.hello.random + 32);
-    std::copy_n(msg.hello.random, 32, client_random_.data());
-    return accumulate(struct2str(msg));
+    std::array<uint8_t, 32> client_random;
+    mpz2bnd(random_prime(32), client_random.begin(), client_random.end());
+    std::copy(client_random.begin(), client_random.end(), this->client_random_.begin());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::CLIENT_HELLO,
+            tls::ClientHello{
+                tls::TLS_VERSION_12,
+                std::move(client_random),
+                std::vector<uint8_t>(32),
+                std::vector{tls::TLS_ECDHE_RSA_AES128_GCM_SHA256},
+                std::vector<uint8_t>{0}
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
-        return alert(2, 10);
-    }
-    accumulate(s);
-    auto *received = reinterpret_cast<client_hello_message *>(s.data());
-    std::copy_n(received->hello.random, 32, client_random_.data());
-    const int len = received->get_cipher_suite_length();
-    const unsigned char *p = received->cipher_suite;
-    // Return null string if TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f) exists in cipher suite list.
-    for (int i = 0; i < len; i += 2) {
-        if (*(p + i) == 0xc0 && *(p + i + 1) == 0x2f) {
-            return "";
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (handshake->handshake_type != tls::CLIENT_HELLO)
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+        auto client_hello = std::get<tls::ClientHello>(handshake->message);
+        accumulate(s);
+        std::copy(client_hello.client_random.begin(), client_hello.client_random.end(), this->client_random_.begin());
+        for (const auto &cipher_suite : client_hello.cipher_suites) {
+            // Support only the one cipher suite.
+            if (cipher_suite == tls::TLS_ECDHE_RSA_AES128_GCM_SHA256) {
+                return ""; // success
+            }
         }
     }
-    // If not, return alert message.
-    return alert(2, 40);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
 std::string TLS12<SV_CLIENT>::server_hello(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
-        return alert(2, 10);
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::SERVER_HELLO)
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+        accumulate(s);
+        auto server_hello = std::get<tls::ServerHello>(msg->message);
+        std::copy(server_hello.server_random.begin(), server_hello.server_random.end(), this->server_random_.begin());
+        this->session_id_.resize(server_hello.session_id.size());
+        std::copy(server_hello.session_id.begin(), server_hello.session_id.end(), this->session_id_.begin());
+        if (server_hello.cipher_suite == tls::TLS_ECDHE_RSA_AES128_GCM_SHA256)
+            return ""; // success
     }
-    accumulate(s);
-    const auto msg = reinterpret_cast<server_hello_message *>(s.data());
-    std::copy_n(msg->hello.random, 32, server_random_.begin());
-    std::copy_n(msg->hello.session_id, 32, session_id_.begin());
-    // Return null string if cipher suite is TLS_ECDHE_RSA_AES128_GCM_SHA256 (0xc02f).
-    if (msg->cipher_suite[0] == 0xc0 && msg->cipher_suite[1] == 0x2f) {
-        return "";
-    }
-    // If not, return alert message.
-    return alert(2, 40);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_hello(std::string &&) {
-    server_hello_message msg;
-    mpz2bnd(random_prime(32), server_random_.begin(), server_random_.end());
-    mpz2bnd(random_prime(32), session_id_.begin(), session_id_.end());
-    std::copy(server_random_.begin(), server_random_.end(), msg.hello.random);
-    std::copy(session_id_.cbegin(), session_id_.cend(), msg.hello.session_id);
-    return accumulate(struct2str(msg));
+    mpz2bnd(random_prime(32), this->server_random_.begin(), this->server_random_.end());
+    mpz2bnd(random_prime(32), this->session_id_.begin(), this->session_id_.end());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::SERVER_HELLO,
+            tls::ServerHello{
+                tls::TLS_VERSION_12,
+                std::array<uint8_t, 32>{this->server_random_},
+                std::vector<uint8_t>{this->session_id_},
+                tls::TLS_ECDHE_RSA_AES128_GCM_SHA256,
+                0
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_CLIENT>::server_certificate(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CERTIFICATE}) {
-        return alert(2, 10);
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::CERTIFICATE)
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+        accumulate(s);
+        tls::Certificate certificate = std::get<tls::Certificate>(msg->message);
+        // Read the first certificate and extract public key parameters.
+        // TODO: Change to check all certificate chains.
+        std::stringstream ss{certificate.certificates[0]};
+        auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
+        if (!opt_pubkey) {
+            spdlog::error("Failed to parse the received certificate.");
+            return alert(tls::FATAL, tls::CERTIFICATE_REVOKED);
+        }
+        auto [K, e, sign] = *opt_pubkey;
+        rsa_.K_ = K;
+        rsa_.e_ = e;
+        return "";
     }
-    accumulate(s);
-    const auto msg = reinterpret_cast<certificate_message *>(s.data());
-    std::stringstream ss;
-    const uint8_t *p = msg->certificate_length[1]; // length of only the first certificate
-    // TODO: Change this method to check all certificate chains.
-    for (int i = 0, j = *p * 0x10000 + *(p + 1) * 0x100 + *(p + 2); i < j; i++) {
-        // Write bytes of the first certificate to ss
-        ss << std::noskipws << msg->certificate[i];
-    }
-    // Read the first certificate and extract public key parameters.
-    auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
-    if (!opt_pubkey) {
-        spdlog::error("Failed to parse the received certificate.");
-        return alert(2, 44);
-    }
-    auto [K, e, sign] = *opt_pubkey;
-    rsa_.K_ = K;
-    rsa_.e_ = e;
-    return "";
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_certificate(std::string &&) {
-    return accumulate(certificate_);
+    return accumulate(certificate_.serialize());
 }
 
 template<bool SV>
@@ -240,6 +270,7 @@ void TLS12<SV>::generate_signature(unsigned char *pub_key, unsigned char *sign) 
     *--ptr = 0x00;
     // Add padding
     std::fill(padded + 2, ptr, 0xff);
+    padded[0] = 0x00;
     padded[1] = 0x01;
 
     // Sign with RSA.
@@ -272,105 +303,191 @@ void TLS12<SV>::derive_keys(const mpz_class &premaster_secret) {
 
 template<>
 std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_KEY_EXCHANGE}) {
-        return alert(2, 10);
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::SERVER_KEY_EXCHANGE)
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+        accumulate(s);
+        auto server_key_exchange = std::get<tls::EcdheRsaServerKeyExchange>(msg->message);
+        if (server_key_exchange.curve_type != tls::NAMED_CURVE ||
+            server_key_exchange.named_curve != tls::NC_SECP256R1 || server_key_exchange.point_format != 0x04) {
+            spdlog::error("server_key_exchange:client: Unsupported curve type, named curve, or point format.");
+            return alert(tls::FATAL, tls::ILLEGAL_PARAMETER);
+        }
+
+        // Extract server's ephemeral public key from received message.
+        const ECPoint Y{
+            bnd2mpz(server_key_exchange.x.begin(), server_key_exchange.x.end()),
+            bnd2mpz(server_key_exchange.y.begin(), server_key_exchange.y.end()),
+            secp256r1_
+        };
+        // Compute shared key.
+        derive_keys((prv_key_ * Y).x_);
+
+        // Check signature.
+        auto z = rsa_.encode(bnd2mpz(server_key_exchange.sign.begin(), server_key_exchange.sign.end()));
+        unsigned char check_sig[RSA_SIG_SIZE];
+        mpz2bnd(z, check_sig, check_sig + sizeof(check_sig));
+        std::vector<uint8_t> check_hash;
+        check_hash.insert(check_hash.end(), client_random_.begin(), client_random_.end());
+        check_hash.insert(check_hash.end(), server_random_.begin(), server_random_.end());
+        check_hash.push_back(server_key_exchange.curve_type);
+        check_hash.push_back(server_key_exchange.named_curve >> 8);
+        check_hash.push_back(server_key_exchange.named_curve);
+        auto point_len = 1 + sizeof(server_key_exchange.x) + sizeof(server_key_exchange.y);
+        check_hash.push_back(point_len);
+        check_hash.push_back(server_key_exchange.point_format);
+        check_hash.insert(check_hash.end(), server_key_exchange.x.begin(), server_key_exchange.x.end());
+        check_hash.insert(check_hash.end(), server_key_exchange.y.begin(), server_key_exchange.y.end());
+
+        SHA256 sha;
+        auto hash = sha.hash(check_hash.begin(), check_hash.end());
+
+        spdlog::debug("Encoded RSA Signature and hash must be same.");
+        spdlog::debug("Encoded RSA Signature: 0x{}", z.get_str(16));
+        spdlog::debug("Hash: 0x{}", bnd2mpz(hash.crbegin(), hash.crend()).get_str(16));
+
+        if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
+            spdlog::error("server_key_exchange:client: Check signature - fail");
+            return alert(tls::FATAL, tls::DECRYPT_ERROR);
+        }
+
+        spdlog::info("server_key_exchange:client: Check signature - success");
+        return "";
     }
-    accumulate(s);
-    const auto p = reinterpret_cast<const server_key_exchange_message *>(s.data());
-    // Extract server's ephemeral public key from received message.
-    const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
-    // Compute shared key.
-    derive_keys((prv_key_ * Y).x_);
 
-    // Check signature.
-    auto z = rsa_.encode(bnd2mpz(p->sign, p->sign + RSA_SIG_SIZE));
-    unsigned char check_sig[RSA_SIG_SIZE];
-    mpz2bnd(z, check_sig, check_sig + RSA_SIG_SIZE);
-    unsigned char check_hash[MESSAGE_TO_HASH_SIZE];
-    std::copy(client_random_.cbegin(), client_random_.cend(), check_hash);
-    std::copy(server_random_.cbegin(), server_random_.cend(), check_hash + RANDOM_SIZE);
-    std::copy_n(&p->named_curve, PUBKEY_SIZE, check_hash + RANDOM_SIZE * 2);
-
-    SHA256 sha;
-    auto hash = sha.hash(check_hash, check_hash + MESSAGE_TO_HASH_SIZE);
-
-    spdlog::debug("Encoded RSA Signature and hash must be same.");
-    spdlog::debug("Encoded RSA Signature: 0x{}", z.get_str(16));
-    spdlog::debug("Hash: 0x{}", bnd2mpz(hash.crbegin(), hash.crend()).get_str(16));
-
-    if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
-        spdlog::error("server_key_exchange:client: Check signature - fail");
-        return alert(2, 51); // decrypt error
-    }
-
-    spdlog::info("server_key_exchange:client: Check signature - success");
-    return "";
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_key_exchange(std::string &&) {
-    server_key_exchange_message msg;
-    msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
-    msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-    msg.handshake.handshake_type = SERVER_KEY_EXCHANGE;
-    mpz2bnd(P_.x_, msg.x, msg.x + 32);
-    mpz2bnd(P_.y_, msg.y, msg.y + 32);
-    generate_signature(&msg.named_curve, msg.sign);
-    return accumulate(struct2str(msg));
+    std::array<uint8_t, 32> x, y;
+    mpz2bnd(P_.x_, x.begin(), x.end());
+    mpz2bnd(P_.y_, y.begin(), y.end());
+
+    std::vector<uint8_t> sign(RSA_SIG_SIZE), pub_key;
+    pub_key.push_back(tls::NAMED_CURVE);
+    pub_key.push_back(tls::NC_SECP256R1 >> 8);
+    pub_key.push_back(tls::NC_SECP256R1);
+    auto point_len = 1 + x.size() + y.size();
+    pub_key.push_back(point_len);
+    pub_key.push_back(4); // uncompressed
+    pub_key.insert(pub_key.end(), x.begin(), x.end());
+    pub_key.insert(pub_key.end(), y.begin(), y.end());
+    generate_signature(pub_key.data(), sign.data());
+
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::SERVER_KEY_EXCHANGE,
+            tls::EcdheRsaServerKeyExchange{
+                tls::NAMED_CURVE,
+                tls::NC_SECP256R1,
+                0x04,
+                std::move(x),
+                std::move(y),
+                tls::SHA256,
+                tls::RSA,
+                std::move(sign)
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_CLIENT>::server_hello_done(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_DONE}) {
-        return alert(2, 10);
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (msg->handshake_type != tls::SERVER_DONE)
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+        accumulate(s);
+        return "";
     }
-    accumulate(s);
-    return "";
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
 std::string TLS12<SV_SERVER>::server_hello_done(std::string &&) {
-    constexpr server_hello_done_message msg;
-    return accumulate(struct2str(msg));
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::SERVER_DONE,
+            tls::ServerHelloDone{},
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_CLIENT>::client_key_exchange(std::string &&) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
-    client_key_exchange_message msg;
-    msg.tls.set_length(sizeof(msg) - sizeof(TLS_header));
-    msg.handshake.set_length(sizeof(msg) - sizeof(TLS_header) - sizeof(handshake_header));
-    // Fill with client's public key coordinates.
-    mpz2bnd(P_.x_, msg.x, msg.x + 32);
-    mpz2bnd(P_.y_, msg.y, msg.y + 32);
-    return accumulate(struct2str(msg));
+    std::array<uint8_t, 32> x, y;
+    mpz2bnd(P_.x_, x.begin(), x.end());
+    mpz2bnd(P_.y_, y.begin(), y.end());
+    tls::Record record{
+        tls::HANDSHAKE,
+        tls::TLS_VERSION_12,
+        {tls::Handshake{
+            tls::CLIENT_KEY_EXCHANGE,
+            tls::EcdheClientKeyExchange{
+                0x04,
+                std::move(x),
+                std::move(y),
+            }
+        }}
+    };
+    return accumulate(record.serialize());
 }
 
 template<>
 std::string TLS12<SV_SERVER>::client_key_exchange(std::string &&s) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_KEY_EXCHANGE}) {
-        return alert(2, 10);
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
+        if (handshake->handshake_type != tls::CLIENT_KEY_EXCHANGE)
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+        accumulate(s);
+        auto client_key_exchange = std::get<tls::EcdheClientKeyExchange>(handshake->message);
+        const ECPoint Y{
+            bnd2mpz(client_key_exchange.x.begin(), client_key_exchange.x.end()),
+            bnd2mpz(client_key_exchange.y.begin(), client_key_exchange.y.end()),
+            secp256r1_
+        };
+        // Compute shared key.
+        derive_keys((prv_key_ * Y).x_);
+        return "";
     }
-    accumulate(s);
-    auto p = reinterpret_cast<client_key_exchange_message *>(s.data());
-    const ECPoint Y{bnd2mpz(p->x, p->x + 32), bnd2mpz(p->y, p->y + 32), secp256r1_};
-    // Compute shared key.
-    derive_keys((prv_key_ * Y).x_);
-    return "";
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<bool SV>
 std::string TLS12<SV>::change_cipher_spec(std::string &&s) {
     if (s.empty()) {
         // send CHANGE_CIPHER_SPEC message
-        change_cipher_spec_message msg;
-        msg.tls.set_length(1);
-        return struct2str(msg);
+        tls::Record record{
+            tls::CHANGE_CIPHER_SPEC,
+            tls::TLS_VERSION_12,
+            {tls::ChangeCipherSpec{tls::ChangeCipherSpec::CHANGE_CIPHER_SPEC}},
+        };
+        return record.serialize();
     }
     // receive CHANGE_CIPHER_SPEC message
-    if (get_content_type(s).first != CHANGE_CIPHER_SPEC) {
-        return alert(2, 10);
+    auto res = tls::Record::parse(s);
+    if (!res || res->content_type != tls::CHANGE_CIPHER_SPEC || res->version != tls::TLS_VERSION_12 ||
+        res->messages.empty()) {
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
+    }
+    if (std::get<tls::ChangeCipherSpec>(res->messages[0]).type != tls::ChangeCipherSpec::CHANGE_CIPHER_SPEC) {
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     }
     return "";
 }
@@ -382,180 +499,90 @@ std::string TLS12<SV>::finished(std::string &&s) {
     prf.secret(master_secret_.cbegin(), master_secret_.cend());
     const auto hash = sha.hash(accumulated_handshakes_.cbegin(), accumulated_handshakes_.cend());
     prf.seed(hash.cbegin(), hash.cend());
-    const char *label[2] = {"client finished", "server finished"};
-    prf.label(label[s.empty() ? SV : !SV]);
+    const char *finished_label[2] = {"client finished", "server finished"};
+    prf.label(finished_label[s.empty() ? SV : !SV]);
     const auto v = prf.get_n_bytes(12);
 
-    handshake_header handshake;
-    handshake.handshake_type = FINISHED;
-    handshake.set_length(12);
-
-    std::string msg = struct2str(handshake) + std::string{v.cbegin(), v.cend()};
+    auto msg = tls::Handshake{tls::FINISHED, tls::Finished{v}}.serialize();
     accumulated_handshakes_ += msg;
 
     if (s.empty()) {
         // Send FINISHED message.
-        return encode(std::move(msg), HANDSHAKE);
+        return encode(std::move(msg), tls::HANDSHAKE);
     }
 
     // Verify received message.
     const auto opt_result = decode(std::move(s));
     if (!opt_result) {
         spdlog::error("Handshake verification failed: Decoding failed.");
-        return alert(2, 51);
+        return alert(tls::FATAL, tls::DECRYPT_ERROR);
     }
     if (*opt_result != msg) {
         spdlog::error("Handshake verification failed: Not matched.");
-        return alert(2, 51);
+        return alert(tls::FATAL, tls::DECRYPT_ERROR);
     }
 
     // Successes to parse received FINISHED message.
     return "";
 }
 
-template<>
-bool TLS12<SV_SERVER>::handshake_sub(
-    const std::function<std::optional<std::string>()> &read_f,
-    const std::function<void(std::string)> &write_f,
-    std::string waiting_msg
-) {
-    std::string s = waiting_msg;
-    std::optional<std::string> a;
-
-    s += this->server_certificate();
-    s += this->server_key_exchange();
-    s += this->server_hello_done();
-    write_f(s);
-
-    EXPECT_RECEIVE(s, a, client_key_exchange);
-    EXPECT_RECEIVE(s, a, change_cipher_spec);
-    EXPECT_RECEIVE(s, a, finished);
-
-    s = this->change_cipher_spec();
-    s += finished();
-    write_f(std::move(s));
-
-    return true;
-error:
-    write_f(s);
-    return false;
-}
-
-template<>
-bool TLS12<SV_SERVER>::handshake(
-    const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
-) {
-    // server-side
-    std::string s;
-    std::optional<std::string> a;
-
-    EXPECT_RECEIVE(s, a, client_hello);
-
-    s = this->server_hello();
-    return handshake_sub(read_f, write_f, std::move(s));
-error:
-    write_f(s);
-    return false;
-}
-
-template<>
-bool TLS12<SV_CLIENT>::handshake_sub(
-    const std::function<std::optional<std::string>()> &read_f,
-    const std::function<void(std::string)> &write_f,
-    std::string waiting_msg
-) {
-    std::string s = waiting_msg;
-    std::optional<std::string> a;
-
-    EXPECT_RECEIVE(s, a, server_certificate);
-    EXPECT_RECEIVE(s, a, server_key_exchange);
-    EXPECT_RECEIVE(s, a, server_hello_done);
-
-    s = this->client_key_exchange();
-    s += this->change_cipher_spec();
-    s += TLS12<SV_CLIENT>::finished();
-    write_f(std::move(s));
-
-    EXPECT_RECEIVE(s, a, change_cipher_spec);
-    EXPECT_RECEIVE(s, a, finished);
-
-    return true;
-error:
-    write_f(s);
-    return false;
-}
-
-template<>
-bool TLS12<SV_CLIENT>::handshake(
-    const std::function<std::optional<std::string>()> &read_f, const std::function<void(std::string)> &write_f
-) {
-    // client-side
-    std::string s;
-    std::optional<std::string> a;
-
-    write_f(client_hello());
-    EXPECT_RECEIVE(s, a, server_hello);
-
-    return handshake_sub(read_f, write_f, "");
-error:
-    write_f(s);
-    return false;
-}
-
 template<bool SV>
-std::string TLS12<SV>::alert(const uint8_t level, const uint8_t desc) {
-    const alert_message h{level, desc};
-    return struct2str(h);
+std::string TLS12<SV>::alert(const tls::AlertLevel level, const tls::AlertDescription desc) {
+    tls::Record record{tls::ALERT, tls::TLS_VERSION_12, {tls::AlertMessage{level, desc}}};
+    return record.serialize();
 }
 
 template<bool SV>
 int TLS12<SV>::alert(std::string &&s) {
-    const auto *p = reinterpret_cast<alert_message *>(s.data());
-    int level, desc;
+    tls::AlertLevel level;
+    tls::AlertDescription desc;
 
-    if (p->tls.get_length() == 2) {
+    const size_t len = (static_cast<uint8_t>(s[3]) << 8) + static_cast<uint8_t>(s[4]);
+    if (len == 2) {
         // For plain alert message
-        level = p->alert_level;
-        desc = p->alert_desc;
+        auto rec = tls::Record::parse(s);
+        auto msg = std::get<tls::AlertMessage>(rec->messages[0]);
+        level = msg.level;
+        desc = msg.description;
     } else {
         // For encrypted alert message
         s = *decode(std::move(s));
-        level = static_cast<uint8_t>(s[0]);
-        desc = static_cast<uint8_t>(s[1]);
+        auto msg = tls::AlertMessage::parse(s);
+        level = msg->level;
+        desc = msg->description;
     }
 
     switch (desc) {
-    // Reuse s
-    case 0: s = "close_notify(0)"; break;
-    case 10: s = "unexpected_message(10)"; break;
-    case 20: s = "bad_record_mac(20)"; break;
-    case 21: s = "decryption_failed_RESERVED(21)"; break;
-    case 22: s = "record_overflow(22)"; break;
-    case 30: s = "decompression_failure(30)"; break;
-    case 40: s = "handshake_failure(40)"; break;
-    case 41: s = "no_certificate_RESERVED(41)"; break;
-    case 42: s = "bad_certificate(42)"; break;
-    case 43: s = "unsupported_certificate(43)"; break;
-    case 44: s = "certificate_revoked(44)"; break;
-    case 45: s = "certificate_expired(45)"; break;
-    case 46: s = "certificate_unknown(46)"; break;
-    case 47: s = "illegal_parameter(47)"; break;
-    case 48: s = "unknown_ca(48)"; break;
-    case 49: s = "access_denied(49)"; break;
-    case 50: s = "decode_error(50)"; break;
-    case 51: s = "decrypt_error(51)"; break;
-    case 60: s = "export_restriction_RESERVED(60)"; break;
-    case 70: s = "protocol_version(70)"; break;
-    case 71: s = "insufficient_security(71)"; break;
-    case 80: s = "internal_error(80)"; break;
-    case 90: s = "user_canceled(90)"; break;
-    case 100: s = "no_renegotiation(100)"; break;
-    case 110: s = "unsupported_extension(110)"; break;
+    case tls::CLOSE_NOTIFY: s = "close_notify(0)"; break;
+    case tls::UNEXPECTED_MESSAGE: s = "unexpected_message(10)"; break;
+    case tls::BAD_RECORD_MAC: s = "bad_record_mac(20)"; break;
+    case tls::DECRYPTION_FAILED_RESERVED: s = "decryption_failed_RESERVED(21)"; break;
+    case tls::RECORD_OVERFLOW: s = "record_overflow(22)"; break;
+    case tls::DECOMPRESSION_FAILURE: s = "decompression_failure(30)"; break;
+    case tls::HANDSHAKE_FAILURE: s = "handshake_failure(40)"; break;
+    case tls::NO_CERTIFICATE_RESERVED: s = "no_certificate_RESERVED(41)"; break;
+    case tls::BAD_CERTIFICATE: s = "bad_certificate(42)"; break;
+    case tls::UNSUPPORTED_CERTIFICATE: s = "unsupported_certificate(43)"; break;
+    case tls::CERTIFICATE_REVOKED: s = "certificate_revoked(44)"; break;
+    case tls::CERTIFICATE_EXPIRED: s = "certificate_expired(45)"; break;
+    case tls::CERTIFICATE_UNKNOWN: s = "certificate_unknown(46)"; break;
+    case tls::ILLEGAL_PARAMETER: s = "illegal_parameter(47)"; break;
+    case tls::UNKNOWN_CA: s = "unknown_ca(48)"; break;
+    case tls::ACCESS_DENIED: s = "access_denied(49)"; break;
+    case tls::DECODE_ERROR: s = "decode_error(50)"; break;
+    case tls::DECRYPT_ERROR: s = "decrypt_error(51)"; break;
+    case tls::EXPORT_RESTRICTION_RESERVED: s = "export_restriction_RESERVED(60)"; break;
+    case tls::PROTOCOL_VERSION: s = "protocol_version(70)"; break;
+    case tls::INSUFFICIENT_SECURITY: s = "insufficient_security(71)"; break;
+    case tls::INTERNAL_ERROR: s = "internal_error(80)"; break;
+    case tls::USER_CANCELED: s = "user_canceled(90)"; break;
+    case tls::NO_RENEGOTIATION: s = "no_renegotiation(100)"; break;
+    case tls::UNSUPPORTED_EXTENSION: s = "unsupported_extension(110)"; break;
     default: s = "alert"; break;
     }
 
-    if (level == 1 || level == 2) {
-        spdlog::error("TLS Alert level {}: {}", level, s);
+    if (level == tls::WARNING || level == tls::FATAL) {
+        spdlog::error("TLS Alert level {}: {}", static_cast<uint8_t>(level), s);
     }
 
     return desc;
@@ -563,8 +590,24 @@ int TLS12<SV>::alert(std::string &&s) {
 
 template<bool SV>
 std::string TLS12<SV>::accumulate(const std::string &s) {
-    accumulated_handshakes_ += s.substr(sizeof(TLS_header));
+    accumulated_handshakes_ += s.substr(5); // Except TLS Header
     return s;
+}
+
+template<bool SV>
+std::string TLS12<SV>::accumulate_raw(const std::string &s) {
+    accumulated_handshakes_ += s;
+    return s;
+}
+
+template<bool SV>
+void TLS12<SV>::set_accumulate(const std::string &replace) {
+    accumulated_handshakes_ = replace;
+}
+
+template<bool SV>
+std::string TLS12<SV>::get_accumulate() {
+    return accumulated_handshakes_;
 }
 
 // Explicit template instantiation

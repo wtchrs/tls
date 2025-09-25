@@ -54,7 +54,7 @@ InsertNewlineAtEOF: true
 MacroBlockBegin: ""
 MacroBlockEnd: ""
 MaxEmptyLinesToKeep: 2
-NamespaceIndentation: All
+NamespaceIndentation: Inner
 SkipMacroDefinitionBody: true
 SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: false
