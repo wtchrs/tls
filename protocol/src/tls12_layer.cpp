@@ -47,19 +47,19 @@ bool tls12_server_handshake_sub(FramedReceive &framed_receive, TLS12<SV_SERVER> 
     s += tls.server_hello_done();
     framed_receive.send(s);
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.client_key_exchange(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.change_cipher_spec(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.finished(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
@@ -80,7 +80,7 @@ bool TLS12LayerServer::handshake() {
     std::string s;
     std::optional<std::string> a;
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = FramedReceive::recv()) || (s = tls.client_hello(std ::move(*a))) != "") {
         FramedReceive::send(s);
         return false;
@@ -97,19 +97,19 @@ bool tls12_client_handshake_sub(FramedReceive &framed_receive, TLS12<SV_CLIENT> 
     std::string s = waiting_msg;
     std::optional<std::string> a;
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.server_certificate(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.server_key_exchange(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.server_hello_done(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
@@ -120,13 +120,13 @@ bool tls12_client_handshake_sub(FramedReceive &framed_receive, TLS12<SV_CLIENT> 
     s += tls.finished();
     framed_receive.send(s);
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.change_cipher_spec(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = framed_receive.recv()) || (s = tls.finished(std ::move(*a))) != "") {
         framed_receive.send(s);
         return false;
@@ -144,7 +144,7 @@ bool TLS12LayerClient::handshake() {
     std::optional<std::string> a;
 
     FramedReceive::send(tls.client_hello());
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = FramedReceive ::recv()) || (s = tls.server_hello(std ::move(*a))) != "") {
         FramedReceive::send(s);
         return false;

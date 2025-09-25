@@ -62,7 +62,7 @@ static mpz_class private_key = init_prv_key();
 template<>
 std::string TLS13<SV_SERVER>::client_hello(std::string &&s) {
     if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, CLIENT_HELLO}) {
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     }
     size_t pos = 43; // starts from session id length position
     size_t session_id_len = s[pos];
@@ -113,9 +113,8 @@ std::string TLS13<SV_SERVER>::server_hello(std::string &&) {
 
 template<>
 std::string TLS13<SV_CLIENT>::server_hello(std::string &&s) {
-    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO}) {
-        return alert(2, 10);
-    }
+    if (get_content_type(s) != std::pair<int, int>{HANDSHAKE, SERVER_HELLO})
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     auto ext_ptr = reinterpret_cast<uint8_t *>(&s[79]);
     if (s.size() > 80 && server_ext(ext_ptr)) {
         accumulate(s);
@@ -215,7 +214,7 @@ std::string TLS13<SV>::finished(std::string &&s) {
     if (s == msg) {
         return "";
     }
-    return this->alert(2, 51);
+    return this->alert(tls::FATAL, tls::DECRYPT_ERROR);
 }
 
 
@@ -233,7 +232,7 @@ std::optional<std::string> TLS13<SV>::decode13(std::string &&s) {
     EncryptedMessage *p = reinterpret_cast<EncryptedMessage *>(s.data());
     uint8_t seq[8] = {};
     if (int type = this->get_content_type(s).first; type != APPLICATION_DATA) {
-        this->alert(this->alert(2, 10));
+        this->alert(this->alert(tls::FATAL, tls::UNEXPECTED_MESSAGE));
         return {};
     }
     mpz2bnd(this->dec_seq_num_++, seq, seq + sizeof(seq));
@@ -251,7 +250,7 @@ std::optional<std::string> TLS13<SV>::decode13(std::string &&s) {
             r.pop_back();
         }
         if (r.back() == ALERT) {
-            this->alert(this->alert(r[0], r[1]));
+            this->alert(this->alert(static_cast<tls::AlertLevel>(r[0]), static_cast<tls::AlertDescription>(r[1])));
             return {};
         }
         r.pop_back();
@@ -259,7 +258,7 @@ std::optional<std::string> TLS13<SV>::decode13(std::string &&s) {
     }
 
     // failed (bad record mac)
-    this->alert(this->alert(2, 20));
+    this->alert(this->alert(tls::FATAL, tls::BAD_RECORD_MAC));
     return {};
 }
 

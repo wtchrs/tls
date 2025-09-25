@@ -41,7 +41,7 @@ bool TLS13LayerServer::handshake() {
     std::string s;
     std::optional<std::string> a;
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = FramedReceive ::recv()) || (s = tls.client_hello(std ::move(*a))) != "") {
         FramedReceive::send(s);
         return false;
@@ -64,13 +64,13 @@ bool TLS13LayerServer::handshake() {
     s += tls.encode(std::move(t), tls::HANDSHAKE);
     FramedReceive::send(s);
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = FramedReceive ::recv()) || (s = tls.change_cipher_spec(std ::move(*a))) != "") {
         FramedReceive::send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = FramedReceive::recv()) || !(a = tls.decode(std::move(*a)))) {
         FramedReceive::send(s);
         return false;
@@ -107,13 +107,13 @@ bool TLS13LayerClient::handshake() {
     // TLS 1.3
     tls.protect_handshake();
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     if (!(a = FramedReceive ::recv()) || (s = tls.change_cipher_spec(std ::move(*a))) != "") {
         FramedReceive::send(s);
         return false;
     }
 
-    s = tls.alert(2, 0);
+    s = tls.alert(tls::FATAL, tls::CLOSE_NOTIFY);
     // TODO: Why does not check received message?
     if (!(a = FramedReceive::recv()) || !(a = tls.decode(std::move(*a)))) {
         FramedReceive::send(s);

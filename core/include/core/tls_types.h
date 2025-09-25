@@ -132,6 +132,37 @@ enum NamedGroup : uint16_t {
     /* ECDHE_PRIVATE_USE(0xFE00..0xFEFF) */
 };
 
+enum AlertLevel : uint8_t { WARNING = 1, FATAL = 2 };
+
+enum AlertDescription : uint8_t {
+    CLOSE_NOTIFY = 0,
+    UNEXPECTED_MESSAGE = 10,
+    BAD_RECORD_MAC = 20,
+    DECRYPTION_FAILED_RESERVED = 21,
+    RECORD_OVERFLOW = 22,
+    DECOMPRESSION_FAILURE = 30,
+    HANDSHAKE_FAILURE = 40,
+    NO_CERTIFICATE_RESERVED = 41,
+    BAD_CERTIFICATE = 42,
+    UNSUPPORTED_CERTIFICATE = 43,
+    CERTIFICATE_REVOKED = 44,
+    CERTIFICATE_EXPIRED = 45,
+    CERTIFICATE_UNKNOWN = 46,
+    ILLEGAL_PARAMETER = 47,
+    UNKNOWN_CA = 48,
+    ACCESS_DENIED = 49,
+    DECODE_ERROR = 50,
+    DECRYPT_ERROR = 51,
+    EXPORT_RESTRICTION_RESERVED = 60,
+    PROTOCOL_VERSION = 70,
+    INSUFFICIENT_SECURITY = 71,
+    INTERNAL_ERROR = 80,
+    USER_CANCELED = 90,
+    NO_RENEGOTIATION = 100,
+    UNSUPPORTED_EXTENSION = 110,
+};
+
+
 struct BaseMessage {
     virtual ~BaseMessage() {}
     virtual std::string serialize() const = 0;
@@ -192,8 +223,6 @@ struct Extensions : public BaseMessage {
 
 
 /***** Handshakes *****/
-
-// TODO: Implement all handshake structs.
 
 struct ClientHello : BaseMessage {
     ProtocolVersion client_hello_version = TLS_VERSION_12;
@@ -398,8 +427,20 @@ struct EncodedMessage : public BaseMessage {
     std::string serialize() const override;
 };
 
-// TODO: Add Alert message
-using Msg = std::variant<Handshake, ChangeCipherSpec, EncodedMessage>;
+struct AlertMessage : public BaseMessage {
+    AlertLevel level;
+    AlertDescription description;
+
+    AlertMessage() = default;
+    AlertMessage(AlertLevel level, AlertDescription description);
+
+    ~AlertMessage() = default;
+
+    static std::optional<AlertMessage> parse(const std::string &raw);
+    std::string serialize() const override;
+};
+
+using Msg = std::variant<Handshake, ChangeCipherSpec, EncodedMessage, AlertMessage>;
 
 struct Record : public BaseMessage {
     ContentType content_type;

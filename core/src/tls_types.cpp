@@ -187,6 +187,27 @@ std::string EncodedMessage::serialize() const {
 }
 
 
+AlertMessage::AlertMessage(AlertLevel level, AlertDescription description)
+    : level{level}
+    , description{description} {}
+
+std::optional<AlertMessage> AlertMessage::parse(const std::string &raw) {
+    if (raw.length() != 2)
+        return std::nullopt;
+    AlertMessage msg;
+    msg.level = static_cast<AlertLevel>(raw[0]);
+    msg.description = static_cast<AlertDescription>(raw[1]);
+    return msg;
+}
+
+std::string AlertMessage::serialize() const {
+    std::string res;
+    res.append(1, this->level);
+    res.append(1, this->description);
+    return res;
+}
+
+
 /***** Handshake Messages *****/
 
 ClientHello::ClientHello(

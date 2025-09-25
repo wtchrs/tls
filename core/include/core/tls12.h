@@ -2,7 +2,6 @@
 #define CORE_TLS12_H
 
 
-#include <cstdint>
 #include <gmpxx.h>
 #include <optional>
 #include <string>
@@ -114,7 +113,7 @@ public:
      * @param desc The alert type as code
      * @return The alert message
      */
-    std::string alert(uint8_t level, uint8_t desc);
+    std::string alert(tls::AlertLevel level, tls::AlertDescription desc);
 
     std::string accumulate(const std::string &s);
     std::string accumulate_raw(const std::string &s);

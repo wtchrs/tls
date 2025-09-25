@@ -22,7 +22,6 @@
 #include "core/sha/sha2.h"
 #include "core/tls12_types.h"
 #include "core/tls_types.h"
-#include "core/utils.h"
 
 static tls::Record init_certificate_message() {
     std::ifstream cert_pem{"./cert/example/cert.pem"};
@@ -148,10 +147,10 @@ template<>
 std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (handshake->handshake_type != tls::CLIENT_HELLO)
-            return alert(2, 10);
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
         auto client_hello = std::get<tls::ClientHello>(handshake->message);
         accumulate(s);
         std::copy(client_hello.client_random.begin(), client_hello.client_random.end(), this->client_random_.begin());
@@ -162,17 +161,17 @@ std::string TLS12<SV_SERVER>::client_hello(std::string &&s) {
             }
         }
     }
-    return alert(2, 40); // handshake_failure
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
 std::string TLS12<SV_CLIENT>::server_hello(std::string &&s) {
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (msg->handshake_type != tls::SERVER_HELLO)
-            return alert(2, 10);
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
         accumulate(s);
         auto server_hello = std::get<tls::ServerHello>(msg->message);
         std::copy(server_hello.server_random.begin(), server_hello.server_random.end(), this->server_random_.begin());
@@ -181,7 +180,7 @@ std::string TLS12<SV_CLIENT>::server_hello(std::string &&s) {
         if (server_hello.cipher_suite == tls::TLS_ECDHE_RSA_AES128_GCM_SHA256)
             return ""; // success
     }
-    return alert(2, 40);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
@@ -209,10 +208,10 @@ template<>
 std::string TLS12<SV_CLIENT>::server_certificate(std::string &&s) {
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (msg->handshake_type != tls::CERTIFICATE)
-            return alert(2, 10);
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
         accumulate(s);
         tls::Certificate certificate = std::get<tls::Certificate>(msg->message);
         // Read the first certificate and extract public key parameters.
@@ -221,14 +220,14 @@ std::string TLS12<SV_CLIENT>::server_certificate(std::string &&s) {
         auto opt_pubkey = der2json(ss).and_then([](auto json_value) { return get_pubkeys(json_value); });
         if (!opt_pubkey) {
             spdlog::error("Failed to parse the received certificate.");
-            return alert(2, 44);
+            return alert(tls::FATAL, tls::CERTIFICATE_REVOKED);
         }
         auto [K, e, sign] = *opt_pubkey;
         rsa_.K_ = K;
         rsa_.e_ = e;
         return "";
     }
-    return alert(2, 40);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
@@ -300,16 +299,16 @@ template<>
 std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (msg->handshake_type != tls::SERVER_KEY_EXCHANGE)
-            return alert(2, 10);
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
         accumulate(s);
         auto server_key_exchange = std::get<tls::EcdheRsaServerKeyExchange>(msg->message);
         if (server_key_exchange.curve_type != tls::NAMED_CURVE ||
             server_key_exchange.named_curve != tls::NC_SECP256R1 || server_key_exchange.point_format != 0x04) {
             spdlog::error("server_key_exchange:client: Unsupported curve type, named curve, or point format.");
-            return alert(2, 47); // illegal parameter
+            return alert(tls::FATAL, tls::ILLEGAL_PARAMETER);
         }
 
         // Extract server's ephemeral public key from received message.
@@ -346,14 +345,14 @@ std::string TLS12<SV_CLIENT>::server_key_exchange(std::string &&s) {
 
         if (!std::equal(hash.cbegin(), hash.cend(), check_sig + (RSA_SIG_SIZE - 32))) {
             spdlog::error("server_key_exchange:client: Check signature - fail");
-            return alert(2, 51); // decrypt error
+            return alert(tls::FATAL, tls::DECRYPT_ERROR);
         }
 
         spdlog::info("server_key_exchange:client: Check signature - success");
         return "";
     }
 
-    return alert(2, 40);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
@@ -397,14 +396,14 @@ template<>
 std::string TLS12<SV_CLIENT>::server_hello_done(std::string &&s) {
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     if (auto msg = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (msg->handshake_type != tls::SERVER_DONE)
-            return alert(2, 10);
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
         accumulate(s);
         return "";
     }
-    return alert(2, 10);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<>
@@ -446,10 +445,10 @@ std::string TLS12<SV_SERVER>::client_key_exchange(std::string &&s) {
     // After `CLIENT_KEY_EXCHANGE`, messages between server and client are encrypted.
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::HANDSHAKE || res->version != tls::TLS_VERSION_12 || res->messages.empty())
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     if (auto handshake = std::get_if<tls::Handshake>(&res->messages[0])) {
         if (handshake->handshake_type != tls::CLIENT_KEY_EXCHANGE)
-            return alert(2, 10);
+            return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
         accumulate(s);
         auto client_key_exchange = std::get<tls::EcdheClientKeyExchange>(handshake->message);
         const ECPoint Y{
@@ -461,7 +460,7 @@ std::string TLS12<SV_SERVER>::client_key_exchange(std::string &&s) {
         derive_keys((prv_key_ * Y).x_);
         return "";
     }
-    return alert(2, 10);
+    return alert(tls::FATAL, tls::HANDSHAKE_FAILURE);
 }
 
 template<bool SV>
@@ -479,10 +478,10 @@ std::string TLS12<SV>::change_cipher_spec(std::string &&s) {
     auto res = tls::Record::parse(s);
     if (!res || res->content_type != tls::CHANGE_CIPHER_SPEC || res->version != tls::TLS_VERSION_12 ||
         res->messages.empty()) {
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     }
     if (std::get<tls::ChangeCipherSpec>(res->messages[0]).type != tls::ChangeCipherSpec::CHANGE_CIPHER_SPEC) {
-        return alert(2, 10);
+        return alert(tls::FATAL, tls::UNEXPECTED_MESSAGE);
     }
     return "";
 }
@@ -510,11 +509,11 @@ std::string TLS12<SV>::finished(std::string &&s) {
     const auto opt_result = decode(std::move(s));
     if (!opt_result) {
         spdlog::error("Handshake verification failed: Decoding failed.");
-        return alert(2, 51);
+        return alert(tls::FATAL, tls::DECRYPT_ERROR);
     }
     if (*opt_result != msg) {
         spdlog::error("Handshake verification failed: Not matched.");
-        return alert(2, 51);
+        return alert(tls::FATAL, tls::DECRYPT_ERROR);
     }
 
     // Successes to parse received FINISHED message.
@@ -522,59 +521,62 @@ std::string TLS12<SV>::finished(std::string &&s) {
 }
 
 template<bool SV>
-std::string TLS12<SV>::alert(const uint8_t level, const uint8_t desc) {
-    const alert_message h{level, desc};
-    return struct2str(h);
+std::string TLS12<SV>::alert(const tls::AlertLevel level, const tls::AlertDescription desc) {
+    tls::Record record{tls::ALERT, tls::TLS_VERSION_12, {tls::AlertMessage{level, desc}}};
+    return record.serialize();
 }
 
 template<bool SV>
 int TLS12<SV>::alert(std::string &&s) {
-    const auto *p = reinterpret_cast<alert_message *>(s.data());
-    int level, desc;
+    tls::AlertLevel level;
+    tls::AlertDescription desc;
 
-    if (p->tls.get_length() == 2) {
+    const size_t len = (static_cast<uint8_t>(s[3]) << 8) + static_cast<uint8_t>(s[4]);
+    if (len == 2) {
         // For plain alert message
-        level = p->alert_level;
-        desc = p->alert_desc;
+        auto rec = tls::Record::parse(s);
+        auto msg = std::get<tls::AlertMessage>(rec->messages[0]);
+        level = msg.level;
+        desc = msg.description;
     } else {
         // For encrypted alert message
         s = *decode(std::move(s));
-        level = static_cast<uint8_t>(s[0]);
-        desc = static_cast<uint8_t>(s[1]);
+        auto msg = tls::AlertMessage::parse(s);
+        level = msg->level;
+        desc = msg->description;
     }
 
     switch (desc) {
-    // Reuse s
-    case 0: s = "close_notify(0)"; break;
-    case 10: s = "unexpected_message(10)"; break;
-    case 20: s = "bad_record_mac(20)"; break;
-    case 21: s = "decryption_failed_RESERVED(21)"; break;
-    case 22: s = "record_overflow(22)"; break;
-    case 30: s = "decompression_failure(30)"; break;
-    case 40: s = "handshake_failure(40)"; break;
-    case 41: s = "no_certificate_RESERVED(41)"; break;
-    case 42: s = "bad_certificate(42)"; break;
-    case 43: s = "unsupported_certificate(43)"; break;
-    case 44: s = "certificate_revoked(44)"; break;
-    case 45: s = "certificate_expired(45)"; break;
-    case 46: s = "certificate_unknown(46)"; break;
-    case 47: s = "illegal_parameter(47)"; break;
-    case 48: s = "unknown_ca(48)"; break;
-    case 49: s = "access_denied(49)"; break;
-    case 50: s = "decode_error(50)"; break;
-    case 51: s = "decrypt_error(51)"; break;
-    case 60: s = "export_restriction_RESERVED(60)"; break;
-    case 70: s = "protocol_version(70)"; break;
-    case 71: s = "insufficient_security(71)"; break;
-    case 80: s = "internal_error(80)"; break;
-    case 90: s = "user_canceled(90)"; break;
-    case 100: s = "no_renegotiation(100)"; break;
-    case 110: s = "unsupported_extension(110)"; break;
+    case tls::CLOSE_NOTIFY: s = "close_notify(0)"; break;
+    case tls::UNEXPECTED_MESSAGE: s = "unexpected_message(10)"; break;
+    case tls::BAD_RECORD_MAC: s = "bad_record_mac(20)"; break;
+    case tls::DECRYPTION_FAILED_RESERVED: s = "decryption_failed_RESERVED(21)"; break;
+    case tls::RECORD_OVERFLOW: s = "record_overflow(22)"; break;
+    case tls::DECOMPRESSION_FAILURE: s = "decompression_failure(30)"; break;
+    case tls::HANDSHAKE_FAILURE: s = "handshake_failure(40)"; break;
+    case tls::NO_CERTIFICATE_RESERVED: s = "no_certificate_RESERVED(41)"; break;
+    case tls::BAD_CERTIFICATE: s = "bad_certificate(42)"; break;
+    case tls::UNSUPPORTED_CERTIFICATE: s = "unsupported_certificate(43)"; break;
+    case tls::CERTIFICATE_REVOKED: s = "certificate_revoked(44)"; break;
+    case tls::CERTIFICATE_EXPIRED: s = "certificate_expired(45)"; break;
+    case tls::CERTIFICATE_UNKNOWN: s = "certificate_unknown(46)"; break;
+    case tls::ILLEGAL_PARAMETER: s = "illegal_parameter(47)"; break;
+    case tls::UNKNOWN_CA: s = "unknown_ca(48)"; break;
+    case tls::ACCESS_DENIED: s = "access_denied(49)"; break;
+    case tls::DECODE_ERROR: s = "decode_error(50)"; break;
+    case tls::DECRYPT_ERROR: s = "decrypt_error(51)"; break;
+    case tls::EXPORT_RESTRICTION_RESERVED: s = "export_restriction_RESERVED(60)"; break;
+    case tls::PROTOCOL_VERSION: s = "protocol_version(70)"; break;
+    case tls::INSUFFICIENT_SECURITY: s = "insufficient_security(71)"; break;
+    case tls::INTERNAL_ERROR: s = "internal_error(80)"; break;
+    case tls::USER_CANCELED: s = "user_canceled(90)"; break;
+    case tls::NO_RENEGOTIATION: s = "no_renegotiation(100)"; break;
+    case tls::UNSUPPORTED_EXTENSION: s = "unsupported_extension(110)"; break;
     default: s = "alert"; break;
     }
 
-    if (level == 1 || level == 2) {
-        spdlog::error("TLS Alert level {}: {}", level, s);
+    if (level == tls::WARNING || level == tls::FATAL) {
+        spdlog::error("TLS Alert level {}: {}", static_cast<uint8_t>(level), s);
     }
 
     return desc;
