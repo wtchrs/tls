@@ -16,7 +16,6 @@
 #include "core/mpz.h"
 #include "core/sha/sha2.h"
 #include "core/tls12.h"
-#include "core/tls12_types.h"
 #include "core/tls_types.h"
 #include "core/utils.h"
 
@@ -219,6 +218,24 @@ std::string TLS13<SV>::finished(std::string &&s) {
 
 
 #pragma pack(push, 1)
+
+struct TLS_header {
+    /** 0x15: Alert, 0x16: Handshake, 0x17: Application data */
+    uint8_t content_type = HANDSHAKE;
+    /** 0x0303 for TLS 1.2 */
+    uint8_t version[2] = {0x03, 0x03};
+    uint8_t length[2] = {0, 4};
+
+    void set_length(const size_t k) {
+        length[0] = k / 0x100;
+        length[1] = k % 0x100;
+    }
+
+    [[nodiscard]]
+    size_t get_length() const {
+        return length[0] * 0x100 + length[1];
+    }
+};
 
 struct EncryptedMessage {
     TLS_header tls;

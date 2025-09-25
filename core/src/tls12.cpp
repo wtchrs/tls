@@ -20,8 +20,14 @@
 #include "core/prf.h"
 #include "core/rsa.h"
 #include "core/sha/sha2.h"
-#include "core/tls12_types.h"
 #include "core/tls_types.h"
+
+
+#define RANDOM_SIZE 32
+#define PUBKEY_SIZE 69
+#define MESSAGE_TO_HASH_SIZE RANDOM_SIZE * 2 + PUBKEY_SIZE
+#define RSA_SIG_SIZE 256
+
 
 static tls::Record init_certificate_message() {
     std::ifstream cert_pem{"./cert/example/cert.pem"};
@@ -584,7 +590,7 @@ int TLS12<SV>::alert(std::string &&s) {
 
 template<bool SV>
 std::string TLS12<SV>::accumulate(const std::string &s) {
-    accumulated_handshakes_ += s.substr(sizeof(TLS_header));
+    accumulated_handshakes_ += s.substr(5); // Except TLS Header
     return s;
 }
 
