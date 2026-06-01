@@ -20,3 +20,6 @@ Testing/
 
 # VCPKG Overlay Ports
 overlays/
+
+# direnv directory
+.direnv
