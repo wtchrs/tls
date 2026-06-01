@@ -1,4 +1,4 @@
-#include <catch2/internal/catch_test_run_info.hpp>
+#include <catch2/catch_test_run_info.hpp>
 #include <catch2/reporters/catch_reporter_event_listener.hpp>
 #include <catch2/reporters/catch_reporter_registrars.hpp>
 #include <spdlog/cfg/env.h>

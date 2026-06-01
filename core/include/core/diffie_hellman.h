@@ -124,7 +124,7 @@ struct fmt::formatter<ECPoint> {
     }
 
     template<typename FormatContext>
-    auto format(const ECPoint &value, FormatContext &ctx) {
+    auto format(const ECPoint &value, FormatContext &ctx) const {
         std::ostringstream oss;
         oss << value;
         return fmt::format_to(ctx.out(), "{}", oss.str());
