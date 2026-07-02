@@ -1,5 +1,7 @@
 build/
-.idea/
+
+# Nix build output symlink
+result
 
 # certificates
 cert/*
@@ -7,6 +9,7 @@ cert/*
 certbot/
 
 # LSP and IDE
+.idea/
 .cache/
 .vscode/
 .clangd
