@@ -35,10 +35,47 @@ openssl rsa -in privkey1.pem -text
 Use the following commands to configure, build, and test:
 
 ```bash
-cmake --preset default
+cmake --preset default -DBUILD_TESTING=ON
 cmake --build build
 ctest --preset default
 ```
+
+> [!NOTE]
+> This preset requires the `VCPKG_ROOT` environment variable and uses vcpkg to resolve CMake dependencies.
+
+## Nix
+
+With the Nix package manager, you do not need vcpkg to get CMake dependencies.
+
+Build:
+
+```bash
+nix build .
+```
+
+Run tests:
+
+```bash
+nix flake check
+```
+
+Enter the development shell:
+
+```bash
+nix develop
+```
+
+Inside the development shell, configure, build, and test with CMake:
+
+```bash
+cmake -B build -G Ninja -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build
+```
+
+> [!NOTE]
+> `nix build .` and `nix flake check` do not provide incremental compilation.
+> For iterative development, use the development shell and run the CMake commands above.
 
 ## TLS 1.3 Handshake
 
