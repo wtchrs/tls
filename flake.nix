@@ -38,12 +38,14 @@
                   [
                     clang-tools
                     cmake
+                    cmake-lint
                     codespell
                     conan
                     cppcheck
                     doxygen
                     gtest
                     lcov
+                    neocmakelsp
                     ninja
                     pkg-config
                     vcpkg
