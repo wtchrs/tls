@@ -4,67 +4,116 @@
   inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0"; # stable Nixpkgs
 
   outputs =
-    { self, ... }@inputs:
-
+    { self, nixpkgs, ... }@inputs:
     let
+      inherit (nixpkgs) lib;
+
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
       ];
+
       forEachSupportedSystem =
         f:
-        inputs.nixpkgs.lib.genAttrs supportedSystems (
+        lib.genAttrs supportedSystems (
           system:
-          f {
-            inherit system;
-            pkgs = import inputs.nixpkgs { inherit system; };
-          }
+          let
+            pkgs = import nixpkgs { inherit system; };
+          in
+          f pkgs
         );
+
+      nativeBuildInputs =
+        pkgs: with pkgs; [
+          cmake
+          ninja
+          pkg-config
+        ];
+
+      runtimeInputs =
+        pkgs: with pkgs; [
+          gmp
+          nettle
+          jsoncpp
+          spdlog
+          fmt
+        ];
+
+      testInputs =
+        pkgs: with pkgs; [
+          catch2_3
+        ];
+
+      devInputs =
+        pkgs:
+        with pkgs;
+        [
+          clang-tools
+          cmake-lint
+          codespell
+          cppcheck
+          lcov
+          neocmakelsp
+          nixfmt
+        ]
+        ++ lib.optionals (!stdenv.hostPlatform.isDarwin) [ gdb ];
+
+      mkPackage =
+        {
+          pkgs,
+          withTests ? false,
+        }:
+        pkgs.stdenv.mkDerivation {
+          pname = if withTests then "custom-tls-check" else "custom-tls";
+          version = "0.1";
+          src = self;
+
+          nativeBuildInputs = nativeBuildInputs pkgs;
+          buildInputs = runtimeInputs pkgs ++ lib.optionals withTests (testInputs pkgs);
+
+          cmakeFlags = [
+            "-DBUILD_TESTING=${if withTests then "ON" else "OFF"}"
+          ];
+
+          doCheck = withTests;
+
+          checkPhase = lib.optionalString withTests ''
+            runHook preCheck
+            ctest --output-on-failure --no-tests=error
+            runHook postCheck
+          '';
+
+          installPhase = lib.optionalString withTests ''
+            mkdir -p $out
+            touch $out/check-passed
+          '';
+        };
     in
     {
-      devShells = forEachSupportedSystem (
-        { pkgs, system }:
-        {
-          default =
-            pkgs.mkShell.override
-              {
-                # Override stdenv in order to change compiler:
-                stdenv = pkgs.clangStdenv;
-              }
-              {
-                packages =
-                  with pkgs;
-                  [
-                    clang-tools
-                    cmake
-                    cmake-lint
-                    codespell
-                    conan
-                    cppcheck
-                    doxygen
-                    gtest
-                    lcov
-                    neocmakelsp
-                    ninja
-                    pkg-config
-                    vcpkg
-                    vcpkg-tool
-                    self.formatter.${system}
+      packages = forEachSupportedSystem (pkgs: {
+        default = mkPackage { inherit pkgs; };
+      });
 
-                    # autotools for gmp
-                    autoconf
-                    automake
-                    libtool
-                    m4
-                  ]
-                  ++ lib.optionals (!stdenv.hostPlatform.isDarwin) [ gdb ];
+      checks = forEachSupportedSystem (pkgs: {
+        default = mkPackage {
+          inherit pkgs;
+          withTests = true;
+        };
+      });
 
-                VCPKG_ROOT = "${pkgs.vcpkg}/share/vcpkg";
-              };
-        }
-      );
+      devShells = forEachSupportedSystem (pkgs: {
+        default =
+          pkgs.mkShell.override
+            {
+              # Override stdenv in order to change compiler:
+              stdenv = pkgs.clangStdenv;
+            }
+            {
+              packages = nativeBuildInputs pkgs ++ runtimeInputs pkgs ++ testInputs pkgs ++ devInputs pkgs;
+            };
+      });
 
-      formatter = forEachSupportedSystem ({ pkgs, ... }: pkgs.nixfmt);
+      formatter = forEachSupportedSystem (pkgs: pkgs.nixfmt);
     };
 }
