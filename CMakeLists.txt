@@ -5,13 +5,15 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if (MSVC)
+if(MSVC)
     set(CMAKE_CXX_FLAGS "/W4")
 else()
     set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-endif ()
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+include(GNUInstallDirs)
 
 # Add custom flags
 add_compile_definitions(PRINT_LOG)
@@ -28,13 +30,25 @@ pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
 # Subdirectories
 add_subdirectory(core)
 add_subdirectory(protocol)
-add_subdirectory(tests)
+
+# Install
+install(TARGETS core protocol
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(DIRECTORY core/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY protocol/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 # Test configurations
 include(CTest)
-enable_testing()
 
-add_test(NAME Catch2Test
-        COMMAND build/tests/tests
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+
+    add_test(NAME Catch2Test
+        COMMAND $<TARGET_FILE:tests>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
+    )
+endif()

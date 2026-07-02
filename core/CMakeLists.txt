@@ -16,11 +16,16 @@ file(GLOB_RECURSE SOURCES
 
 add_library(core STATIC ${SOURCES})
 
-target_include_directories(core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
 target_link_libraries(core PUBLIC
         PkgConfig::gmpxx
         PkgConfig::nettle
         PkgConfig::hogweed
         JsonCpp::JsonCpp
 )
+
 target_link_libraries(core PRIVATE spdlog::spdlog)
