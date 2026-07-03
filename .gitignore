@@ -1,4 +1,5 @@
 build/
+build-coverage/
 
 # Nix build output symlink
 result

@@ -3,15 +3,26 @@
     "configurePresets": [
         {
             "name": "vcpkg",
+            "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
         },
         {
             "name": "default",
-            "inherits": "vcpkg"
+            "inherits": "vcpkg",
+            "binaryDir": "${sourceDir}/build"
+        },
+        {
+            "name": "coverage",
+            "inherits": "vcpkg",
+            "binaryDir": "${sourceDir}/build-coverage",
+            "cacheVariables": {
+                "BUILD_TESTING": "ON",
+                "ENABLE_COVERAGE": "ON",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
         }
     ],
     "buildPresets": [

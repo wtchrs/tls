@@ -6,14 +6,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "/W4")
+    add_compile_options(/W4)
 else()
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+    add_compile_options(-Wall -Wextra)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(GNUInstallDirs)
+include(cmake/Coverage.cmake)
 
 # Add custom flags
 add_compile_definitions(PRINT_LOG)
@@ -26,6 +27,13 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(gmpxx REQUIRED IMPORTED_TARGET gmpxx)
 pkg_check_modules(nettle REQUIRED IMPORTED_TARGET nettle)
 pkg_check_modules(hogweed REQUIRED IMPORTED_TARGET hogweed)
+
+# Test coverage
+option(ENABLE_COVERAGE "Enable coverage instrumentation" OFF)
+
+if(ENABLE_COVERAGE)
+    enable_coverage_flags()
+endif()
 
 # Subdirectories
 add_subdirectory(core)
@@ -51,4 +59,8 @@ if(BUILD_TESTING)
         COMMAND $<TARGET_FILE:tests>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
+
+    if(ENABLE_COVERAGE)
+        add_lcov_coverage_target()
+    endif()
 endif()
