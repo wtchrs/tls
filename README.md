@@ -40,8 +40,15 @@ cmake --build build
 ctest --preset default
 ```
 
+Generate the test coverage report:
+
+```bash
+cmake --preset coverage
+cmake --build build-coverage --target coverage
+```
+
 > [!NOTE]
-> This preset requires the `VCPKG_ROOT` environment variable and uses vcpkg to resolve CMake dependencies.
+> These presets require the `VCPKG_ROOT` environment variable and use vcpkg to resolve CMake dependencies. `coverage` preset also requires `lcov`, `gcov`, and `genhtml` binaries.
 
 ## Nix
 
@@ -71,6 +78,18 @@ Inside the development shell, configure, build, and test with CMake:
 cmake -B build -G Ninja -DBUILD_TESTING=ON
 cmake --build build
 ctest --test-dir build
+```
+
+Generate test coverage report:
+
+```bash
+cmake -B build-coverage \
+  -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DENABLE_COVERAGE=ON \
+  -DCMAKE_BUILD_TYPE=Debug
+
+cmake --build build-coverage --target coverage
 ```
 
 > [!NOTE]
