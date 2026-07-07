@@ -103,15 +103,9 @@
       });
 
       devShells = forEachSupportedSystem (pkgs: {
-        default =
-          pkgs.mkShell.override
-            {
-              # Override stdenv in order to change compiler:
-              stdenv = pkgs.clangStdenv;
-            }
-            {
-              packages = nativeBuildInputs pkgs ++ runtimeInputs pkgs ++ testInputs pkgs ++ devInputs pkgs;
-            };
+        default = pkgs.mkShell {
+          packages = nativeBuildInputs pkgs ++ runtimeInputs pkgs ++ testInputs pkgs ++ devInputs pkgs;
+        };
       });
 
       formatter = forEachSupportedSystem (pkgs: pkgs.nixfmt);
